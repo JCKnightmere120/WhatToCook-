@@ -11,6 +11,7 @@ use App\Http\Controllers\ShoppingListController;
 use App\Http\Controllers\RecipeEngagementController;
 use App\Http\Controllers\MealHistoryController;
 use App\Http\Controllers\NutritionController;
+use App\Http\Controllers\RecipeMatchController;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
@@ -33,7 +34,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/pantry/{id}', [PantryController::class, 'update']);
     Route::delete('/pantry/{id}', [PantryController::class, 'destroy']);
 
+    // Recipe matching must come BEFORE the recipes apiResource,
+    // otherwise "matched" gets swallowed by the {recipe} wildcard.
+    Route::get('/recipes/matched', [RecipeMatchController::class, 'matched']);
     Route::apiResource('recipes', RecipeController::class);
+
     Route::get('/nutrition/search', [NutritionController::class, 'search']);
     Route::get('/nutrition/foods/{fdcId}', [NutritionController::class, 'show'])->whereNumber('fdcId');
     Route::get('/favorites', [RecipeEngagementController::class, 'favorites']);
