@@ -34,5 +34,9 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
+    'usda' => [
+    'key' => env('USDA_API_KEY'),
+    'base_url' => 'https://api.nal.usda.gov/fdc/v1',
+    ],
 
 ];

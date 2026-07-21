@@ -16,7 +16,6 @@ return new class extends Migration
             $table->string('unit')->nullable();
             $table->date('purchase_date')->nullable();
             $table->date('expiry_date')->nullable();
-            $table->string('spoilage_risk')->default('low');
             $table->timestamps();
         });
     }
