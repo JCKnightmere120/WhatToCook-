@@ -50,4 +50,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('meal-plans', MealPlanController::class)->except(['show']);
     Route::apiResource('meal-history', MealHistoryController::class)->except(['show']);
     Route::apiResource('shopping-list', ShoppingListController::class)->except(['show']);
+    Route::post('/shopping-list/generate-from-recipe/{recipe}', [ShoppingListController::class, 'generateFromRecipe']);
+    Route::apiResource('shopping-list', ShoppingListController::class)->except(['show']);
 });
