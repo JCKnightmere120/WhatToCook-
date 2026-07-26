@@ -34,10 +34,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/pantry/{id}', [PantryController::class, 'update']);
     Route::delete('/pantry/{id}', [PantryController::class, 'destroy']);
 
-    // Recipe matching must come BEFORE the recipes apiResource,
-    // otherwise "matched" gets swallowed by the {recipe} wildcard.
     Route::get('/recipes/matched', [RecipeMatchController::class, 'matched']);
-    Route::apiResource('recipes', RecipeController::class);
+    Route::apiResource('recipes', RecipeController::class)->only(['index', 'show']);
+
+    Route::middleware('admin')->group(function () {
+    Route::apiResource('recipes', RecipeController::class)->only(['store', 'update', 'destroy']);
+});
 
     Route::get('/nutrition/search', [NutritionController::class, 'search']);
     Route::get('/nutrition/foods/{fdcId}', [NutritionController::class, 'show'])->whereNumber('fdcId');
