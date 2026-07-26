@@ -12,6 +12,8 @@ use App\Http\Controllers\RecipeEngagementController;
 use App\Http\Controllers\MealHistoryController;
 use App\Http\Controllers\NutritionController;
 use App\Http\Controllers\RecipeMatchController;
+use App\Http\Controllers\ExportController;
+use App\Http\Controllers\SubstitutionController;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
@@ -39,6 +41,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::middleware('admin')->group(function () {
     Route::apiResource('recipes', RecipeController::class)->only(['store', 'update', 'destroy']);
+    Route::get('/shopping-list/export/text', [ExportController::class, 'text']);
+    Route::get('/shopping-list/export/pdf', [ExportController::class, 'pdf']);
+    Route::get('/shopping-list/export/image', [ExportController::class, 'image']);
 });
 
     Route::get('/nutrition/search', [NutritionController::class, 'search']);
@@ -51,7 +56,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/reviews/{review}', [RecipeEngagementController::class, 'deleteReview']);
     Route::apiResource('meal-plans', MealPlanController::class)->except(['show']);
     Route::apiResource('meal-history', MealHistoryController::class)->except(['show']);
-    Route::apiResource('shopping-list', ShoppingListController::class)->except(['show']);
     Route::post('/shopping-list/generate-from-recipe/{recipe}', [ShoppingListController::class, 'generateFromRecipe']);
+    Route::post('/shopping-list/generate-from-recipe/{recipe}', [ShoppingListController::class, 'generateFromRecipe']);
+    Route::get('/shopping-list/export/text', [ExportController::class, 'text']);
+    Route::get('/shopping-list/export/pdf', [ExportController::class, 'pdf']);
+    Route::get('/shopping-list/export/image', [ExportController::class, 'image']);
     Route::apiResource('shopping-list', ShoppingListController::class)->except(['show']);
+    Route::get('/recipes/{recipe}/substitutions', [SubstitutionController::class, 'forRecipe']);
 });
