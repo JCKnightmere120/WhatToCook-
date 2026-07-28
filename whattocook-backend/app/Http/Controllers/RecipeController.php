@@ -3,10 +3,81 @@
 namespace App\Http\Controllers;
 
 use App\Models\Recipe;
+use App\Models\FamilyMember;
+use App\Models\HouseholdProfile;
+use App\Models\PantryItem;
+use App\Models\Profile;
+use App\Services\RecipeMatcher;
 use Illuminate\Http\Request;
 
 class RecipeController extends Controller
 {
+    public function recommendations(Request $request, RecipeMatcher $matcher)
+    {
+        $familyId = $request->validate(['family_id' => 'nullable|integer|exists:families,id'])['family_id'] ?? null;
+        if ($familyId !== null) {
+            abort_unless(FamilyMember::where(['family_id' => $familyId, 'user_id' => $request->user()->id, 'status' => 'accepted'])->exists(), 403);
+        }
+
+        $pantry = PantryItem::where(fn ($query) => $familyId === null
+            ? $query->where('user_id', $request->user()->id)
+            : $query->where(fn ($items) => $items->where('user_id', $request->user()->id)->whereNull('family_id'))->orWhere('family_id', $familyId))
+            ->whereIn('freshness_status', ['fresh', 'review'])
+            ->get();
+        $blockedIngredients = $familyId === null
+            ? $this->profileBlockedIngredients(Profile::where('user_id', $request->user()->id)->first())
+            : $this->familyBlockedIngredients($familyId);
+        $results = Recipe::with('ingredients')->get()
+            ->filter(fn (Recipe $recipe) => ! $this->containsBlockedIngredient($recipe, $blockedIngredients))
+            ->map(fn (Recipe $recipe) => $matcher->match($recipe, $pantry))
+            ->sortByDesc('match_percentage')
+            ->values();
+
+        return response()->json(['recommendations' => $results]);
+    }
+
+    private function familyBlockedIngredients(int $familyId): array
+    {
+        return HouseholdProfile::where('family_id', $familyId)->get()
+            ->flatMap(function (HouseholdProfile $profile) {
+                $allergies = $profile->allergies ?? [];
+                $restrictions = $profile->dietary_restrictions ?? [];
+                $blocked = array_map('strtolower', $allergies);
+                if (in_array('vegetarian', array_map('strtolower', $restrictions), true)) {
+                    $blocked = [...$blocked, 'chicken', 'pork', 'beef', 'fish', 'seafood', 'meat'];
+                }
+                if (in_array('vegan', array_map('strtolower', $restrictions), true)) {
+                    $blocked = [...$blocked, 'chicken', 'pork', 'beef', 'fish', 'seafood', 'meat', 'egg', 'milk', 'dairy'];
+                }
+                return $blocked;
+            })
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function profileBlockedIngredients(?Profile $profile): array
+    {
+        if (! $profile) return [];
+        $blocked = array_map('strtolower', $profile->allergies ?? []);
+        $restrictions = array_map('strtolower', $profile->dietary_restrictions ?? []);
+        if (in_array('vegetarian', $restrictions, true)) $blocked = [...$blocked, 'chicken', 'pork', 'beef', 'fish', 'seafood', 'meat'];
+        if (in_array('vegan', $restrictions, true)) $blocked = [...$blocked, 'chicken', 'pork', 'beef', 'fish', 'seafood', 'meat', 'egg', 'milk', 'dairy'];
+        return array_values(array_unique($blocked));
+    }
+
+    private function containsBlockedIngredient(Recipe $recipe, array $blockedIngredients): bool
+    {
+        return $recipe->ingredients->contains(function ($ingredient) use ($blockedIngredients) {
+            $name = strtolower($ingredient->name);
+            foreach ($blockedIngredients as $blocked) {
+                if (str_contains($name, $blocked)) return true;
+            }
+            return false;
+        });
+    }
+
     public function index(Request $request)
     {
         return response()->json(Recipe::with('ingredients')->when($request->region, fn ($q, $region) => $q->where('region', $region))->paginate(20));

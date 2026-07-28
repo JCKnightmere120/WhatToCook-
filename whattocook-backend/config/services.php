@@ -38,5 +38,8 @@ return [
     'key' => env('USDA_API_KEY'),
     'base_url' => 'https://api.nal.usda.gov/fdc/v1',
     ],
+    'open_food_facts' => [
+        'base_url' => env('OPEN_FOOD_FACTS_URL', 'https://world.openfoodfacts.org'),
+    ],
 
 ];
