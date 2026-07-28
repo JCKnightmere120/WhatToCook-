@@ -1,20 +1,41 @@
 import { Component } from '@angular/core';
 import { BarcodeFormat, BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
 import { ApiService, Family, PantryInputCandidate, PantryItem } from '../services/api.service';
+import { AuthService } from '../services/auth.service';
+import { HouseholdContextService } from '../services/household-context.service';
 
 interface PantryForm { name: string; quantity: string; unit: string; purchase_date: string; expiry_date: string; freshness_review_date: string; purchase_source: string; storage_type: string; freshness_condition: string; family_id: number | null; }
 @Component({ selector: 'app-pantry', templateUrl: 'pantry.page.html', styleUrls: ['pantry.page.scss'], standalone: false })
 export class PantryPage {
-  personalItems: PantryItem[] = []; householdItems: PantryItem[] = []; families: Family[] = []; form: PantryForm = this.emptyForm(); editingId: number | null = null;
+  personalItems: PantryItem[] = []; householdItems: PantryItem[] = []; families: Family[] = []; activeFamily?: Family; viewFamilyId: number | null = null; form: PantryForm = this.emptyForm(); editingId: number | null = null;
   message = ''; saving = false; processingInput = false; listening = false; receiptText = '';
   drafts: PantryInputCandidate[] = [];
   showAdvancedDetails = false;
   readonly commonUnits = ['pieces', 'cans', 'packs', 'bottles', 'boxes', 'kg', 'g', 'ml', 'litre'];
   private recognition: any; private voiceTranscript = '';
-  constructor(private api: ApiService) {}
+  constructor(private api: ApiService, private householdContext: HouseholdContextService, private auth: AuthService) {}
   ionViewWillEnter() { this.loadFamilies(); }
-  loadPantryItems(familyId: number | null = this.form.family_id) { if (!this.api.hasToken) return; this.api.pantry(undefined, true).subscribe({ next: items => this.personalItems = items, error: () => this.message = 'Your account session has expired. Please sign in again.' }); if (familyId) this.api.pantry(familyId).subscribe({ next: items => this.householdItems = items.filter(item => item.family_id === familyId), error: () => this.message = 'Your account session has expired. Please sign in again.' }); else this.householdItems = []; }
-  loadFamilies() { this.api.families().subscribe({ next: families => { this.families = families; const activeId = Number(localStorage.getItem('whattocook_active_family')); this.form.family_id = families.some(family => family.id === activeId) ? activeId : null; this.loadPantryItems(this.form.family_id); }, error: () => this.loadPantryItems(null) }); }
+  loadPantryItems(familyId: number | null = this.viewFamilyId) { if (!this.api.hasToken) return; this.api.pantry(undefined, true).subscribe({ next: items => this.personalItems = items, error: () => this.message = 'Your account session has expired. Please sign in again.' }); if (familyId) this.api.pantry(familyId).subscribe({ next: items => this.householdItems = items.filter(item => item.family_id === familyId), error: () => this.message = 'Your account session has expired. Please sign in again.' }); else this.householdItems = []; }
+  loadFamilies() {
+    const userId = this.auth.user?.id;
+    this.householdContext.refresh(userId).subscribe({
+      next: context => {
+        this.families = context.families;
+        this.activeFamily = context.activeFamily || undefined;
+        this.viewFamilyId = this.activeFamily?.id || null;
+        const currentDestinationStillExists = this.form.family_id === null || this.families.some(family => family.id === this.form.family_id);
+        if (!currentDestinationStillExists) this.form.family_id = this.viewFamilyId;
+        this.loadPantryItems();
+      },
+      error: () => {
+        this.families = [];
+        this.activeFamily = undefined;
+        this.viewFamilyId = null;
+        this.message = 'Could not load your household. Showing your personal pantry only.';
+        this.loadPantryItems(null);
+      },
+    });
+  }
   startAdd() { const familyId = this.form.family_id; this.editingId = null; this.form = this.emptyForm(familyId); this.showAdvancedDetails = false; this.message = ''; }
   adjustQuantity(change: number) { const next = Math.max(1, Number(this.form.quantity || 0) + change); this.form.quantity = String(next); }
   chooseUnit(unit: string) { this.form.unit = unit; }
@@ -28,7 +49,7 @@ export class PantryPage {
   useDraft(draft: PantryInputCandidate) { this.applyCandidate(draft, 'Review this draft, then add it to the pantry.'); this.drafts = this.drafts.filter(item => item !== draft); }
   private applyCandidates(candidates: PantryInputCandidate[], message: string) { this.drafts = [...candidates]; this.applyCandidate(this.drafts.shift(), candidates.length > 1 ? `${message} Review each detected item below.` : message); }
   private applyCandidate(candidate: PantryInputCandidate | undefined, message: string) { if (candidate) { this.form.name = candidate.name || this.form.name; this.form.quantity = candidate.quantity || this.form.quantity; this.form.unit = candidate.unit || this.form.unit; this.form.purchase_source = candidate.purchase_source || this.form.purchase_source; this.form.storage_type = candidate.storage_type || this.form.storage_type; } this.message = message; this.processingInput = false; }
-  savePantryItem() { if (!this.form.name.trim() || !Number(this.form.quantity) || !this.form.unit.trim()) { this.message = 'Enter an ingredient, a positive quantity, and a unit.'; return; } this.saving = true; this.message = ''; const request = this.editingId ? this.api.updatePantry(this.editingId, this.form) : this.api.addPantry(this.form); request.subscribe({ next: () => { const familyId = this.form.family_id; this.editingId = null; this.form = this.emptyForm(familyId); this.message = 'Pantry item saved.'; this.saving = false; this.loadPantryItems(familyId); }, error: error => { this.message = error?.error?.message || 'Could not save the pantry item.'; this.saving = false; } }); }
+  savePantryItem() { if (!this.form.name.trim() || !Number(this.form.quantity) || !this.form.unit.trim()) { this.message = 'Enter an ingredient, a positive quantity, and a unit.'; return; } this.saving = true; this.message = ''; const request = this.editingId ? this.api.updatePantry(this.editingId, this.form) : this.api.addPantry(this.form); request.subscribe({ next: () => { const familyId = this.form.family_id; this.editingId = null; this.form = this.emptyForm(familyId); this.message = 'Pantry item saved.'; this.saving = false; this.loadPantryItems(); }, error: error => { this.message = error?.error?.message || 'Could not save the pantry item.'; this.saving = false; } }); }
   deletePantryItem(item: PantryItem) { if (!confirm(`Delete ${item.name} from the pantry?`)) return; this.api.deletePantry(item.id).subscribe({ next: () => { if (this.editingId === item.id) this.startAdd(); this.message = 'Pantry item deleted.'; this.loadPantryItems(); }, error: () => this.message = 'Could not delete the pantry item.' }); }
   recordFreshnessAction(item: PantryItem, action: 'still_fresh' | 'spoiled' | 'used' | 'discarded' | 'undo_used') { let usedQuantity: number | undefined; if (action === 'used') { const answer = prompt(`How much ${item.name} was used? Available: ${item.quantity_value || item.quantity} ${item.unit || ''}`); if (answer === null) return; usedQuantity = Number(answer); if (!usedQuantity || usedQuantity <= 0) { this.message = 'Enter a positive amount used.'; return; } } this.api.updateFreshness(item.id, action, usedQuantity).subscribe({ next: ({ item: updated }) => { this.message = `${updated.name} updated.`; this.loadPantryItems(); }, error: error => this.message = error?.error?.message || 'Could not update freshness.' }); }
   isAttention(item: PantryItem): boolean { return item.freshness_status === 'review' || (!!item.freshness_review_date && new Date(item.freshness_review_date).getTime() <= Date.now()); }

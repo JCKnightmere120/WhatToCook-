@@ -1,6 +1,7 @@
 import { Component } from '@angular/core';
 import { ApiService, Family, HouseholdProfile } from '../services/api.service';
 import { AuthService } from '../services/auth.service';
+import { HouseholdContextService } from '../services/household-context.service';
 
 type DietField = 'health_conditions' | 'allergies' | 'dietary_restrictions' | 'likes' | 'dislikes';
 interface DinerForm { id: number | null; user_id: number | null; name: string; relation: string; sex: string; birth_date: string; height_cm: string; weight_kg: string; activity_level: string; goal: string; health_conditions: string; allergies: string; dietary_restrictions: string; likes: string; dislikes: string; visible_to_family: Record<string, boolean>; }
@@ -25,21 +26,20 @@ export class FamilyPage {
     { key: 'dislikes', label: 'Food dislikes', hint: 'e.g. ampalaya' },
   ];
 
-  constructor(private api: ApiService, public auth: AuthService) {}
+  constructor(private api: ApiService, private householdContext: HouseholdContextService, public auth: AuthService) {}
   ionViewWillEnter(): void { this.load(); }
   get isOwner(): boolean { return !!this.selected && this.selected.owner_id === this.auth.user?.id; }
   canManage(profile: HouseholdProfile): boolean { return this.isOwner || profile.user_id === this.auth.user?.id; }
 
   load(): void {
     this.loading = true;
-    this.api.families().subscribe({ next: families => {
-      this.families = families;
-      const id = Number(localStorage.getItem('whattocook_active_family'));
-      this.selected = families.find(family => family.id === id) || families[0];
-      if (this.selected) this.select(this.selected); else this.loading = false;
+    this.householdContext.refresh(this.auth.user?.id).subscribe({ next: context => {
+      this.families = context.families;
+      this.selected = context.activeFamily || undefined;
+      if (this.selected) this.loadProfiles(); else this.loading = false;
     }, error: () => { this.message = 'Could not load your family accounts.'; this.loading = false; } });
   }
-  select(family: Family): void { this.selected = family; localStorage.setItem('whattocook_active_family', String(family.id)); this.loadProfiles(); }
+  select(family: Family): void { this.selected = family; this.householdContext.select(this.auth.user?.id, family); this.loadProfiles(); }
   loadProfiles(): void { if (!this.selected) return; this.api.householdProfiles(this.selected.id).subscribe({ next: response => { this.profiles = response.household_profiles; this.loading = false; }, error: () => { this.message = 'Could not load household profiles.'; this.loading = false; } }); }
   create(): void { if (!this.newFamilyName.trim()) return; this.api.createFamily(this.newFamilyName.trim()).subscribe({ next: family => { this.newFamilyName = ''; this.families = [...this.families, family]; this.select(family); this.message = 'Family account created.'; }, error: () => this.message = 'Could not create the family account.' }); }
   invite(): void { if (!this.selected || !this.inviteEmail.trim()) return; this.api.addFamilyMember(this.selected.id, this.inviteEmail.trim()).subscribe({ next: () => { this.inviteEmail = ''; this.message = 'Family member added.'; this.load(); }, error: error => this.message = error?.error?.message || 'That account could not be added. It must be registered first.' }); }
