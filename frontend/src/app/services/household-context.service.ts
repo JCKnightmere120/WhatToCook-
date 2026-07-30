@@ -32,7 +32,12 @@ export class HouseholdContextService {
     return this.stateSubject.value;
   }
 
-  /** Loads accepted households and resolves a valid active household. */
+  /** Removes all account-specific context, such as when signing out. */
+  clear(): void {
+    this.publishState(null, [], null);
+  }
+
+  /** Loads accepted households and resolves the user's chosen plan context. */
   refresh(userId: number | undefined): Observable<HouseholdContextState> {
     if (!userId || !this.api.hasToken) {
       return of(this.publishState(null, [], null));
@@ -40,8 +45,10 @@ export class HouseholdContextService {
 
     return this.api.families().pipe(
       map(families => {
-        const savedFamilyId = this.readSavedFamilyId(userId);
-        const activeFamily = families.find(family => family.id === savedFamilyId) || families[0] || null;
+        const savedContext = this.readSavedContext(userId);
+        const activeFamily = savedContext === 'personal'
+          ? null
+          : families.find(family => family.id === savedContext) || null;
         return this.publishState(userId, families, activeFamily);
       }),
     );
@@ -66,11 +73,7 @@ export class HouseholdContextService {
   private publishState(userId: number | null, families: Family[], activeFamily: Family | null): HouseholdContextState {
     if (userId) {
       const key = this.storageKey(userId);
-      if (activeFamily) {
-        localStorage.setItem(key, String(activeFamily.id));
-      } else {
-        localStorage.removeItem(key);
-      }
+      localStorage.setItem(key, activeFamily ? String(activeFamily.id) : 'personal');
     }
 
     const state = { userId, families, activeFamily };
@@ -78,14 +81,16 @@ export class HouseholdContextService {
     return state;
   }
 
-  private readSavedFamilyId(userId: number): number | null {
-    const savedId = Number(localStorage.getItem(this.storageKey(userId)));
+  private readSavedContext(userId: number): number | 'personal' {
+    const saved = localStorage.getItem(this.storageKey(userId));
+    if (saved === 'personal') return 'personal';
+    const savedId = Number(saved);
     if (savedId) return savedId;
 
     // Migrate the selection used by earlier versions, if it belongs to one of
     // this account's accepted households. The family list validates it later.
     const legacyId = Number(localStorage.getItem('whattocook_active_family'));
-    return legacyId || null;
+    return legacyId || 'personal';
   }
 
   private storageKey(userId: number): string {

@@ -8,6 +8,7 @@ use Illuminate\Support\Str;
 
 class PantryInputService
 {
+    public function __construct(private IngredientCatalogService $catalog) {}
     /** Build safe, editable pantry candidates. Nothing is persisted here. */
     public function fromBarcode(string $barcode): array
     {
@@ -26,17 +27,22 @@ class PantryInputService
             'barcode' => $barcode,
             'needs_review' => true,
             'message' => $name ? 'Product found. Please confirm its pantry details.' : 'Product was not found. Enter its name and confirm the details.',
-            'candidates' => [$this->candidate($name, $product['quantity'] ?? null)],
+            ...$this->groupCandidates([$this->candidate($name, $product['quantity'] ?? null)]),
         ];
     }
 
     public function fromVoice(string $transcript): array
     {
+        return $this->fromText($transcript, 'voice');
+    }
+
+    public function fromText(string $text, string $source): array
+    {
         return [
-            'source' => 'voice',
+            'source' => $source,
             'needs_review' => true,
             'message' => 'Voice input was converted into editable pantry details. Please verify it before saving.',
-            'candidates' => $this->parseText($transcript),
+            ...$this->groupCandidates($this->parseText($text)),
         ];
     }
 
@@ -53,7 +59,7 @@ class PantryInputService
             'message' => $text !== ''
                 ? 'Receipt text was converted into editable candidates. Verify each item before saving.'
                 : 'Receipt uploaded. OCR is not configured yet, so enter or paste the receipt text to create candidates.',
-            'candidates' => $text !== '' ? $this->parseText($text) : [],
+            ...$this->groupCandidates($text !== '' ? $this->parseText($text) : []),
         ];
     }
 
@@ -80,12 +86,18 @@ class PantryInputService
     private function candidate(string $name, ?string $quantityText): array
     {
         preg_match('/^(\d+(?:\.\d+)?)\s*(.*)$/', trim((string) $quantityText), $amount);
-        return [
+        $candidate = [
             'name' => Str::title(trim($name)),
             'quantity' => $amount[1] ?? null,
             'unit' => trim($amount[2] ?? '') ?: null,
             'purchase_source' => 'unknown',
             'storage_type' => 'unknown',
         ];
+        return [...$candidate, ...$this->catalog->resolve($name)];
+    }
+
+    private function groupCandidates(array $candidates): array
+    {
+        return ['accepted' => array_values(array_filter($candidates, fn ($item) => $item['status'] === 'accepted')), 'suggested' => array_values(array_filter($candidates, fn ($item) => $item['status'] === 'suggested')), 'rejected' => array_values(array_filter($candidates, fn ($item) => $item['status'] === 'rejected')), 'candidates' => array_values(array_filter($candidates, fn ($item) => $item['status'] !== 'rejected'))];
     }
 }

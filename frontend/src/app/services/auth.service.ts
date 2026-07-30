@@ -1,9 +1,10 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Observable, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { Capacitor } from '@capacitor/core';
+import { HouseholdContextService } from './household-context.service';
 
 export interface AppUser { id: number; name: string; email: string; }
 interface AuthResponse { user: AppUser; token: string; message: string; }
@@ -13,7 +14,7 @@ export class AuthService {
   private readonly tokenKey = 'whattocook_token';
   private readonly userKey = 'whattocook_user';
 
-  constructor(private http: HttpClient, private router: Router) {}
+  constructor(private http: HttpClient, private router: Router, private householdContext: HouseholdContextService) {}
   private get baseUrl(): string {
     return Capacitor.getPlatform() === 'android' && Capacitor.isNativePlatform()
       ? environment.androidApiBaseUrl
@@ -38,10 +39,27 @@ export class AuthService {
   }
 
   logout(): void {
+    const token = this.token;
+    if (token) {
+      this.http.post(`${this.baseUrl}/logout`, {}, { headers: new HttpHeaders({ Authorization: `Bearer ${token}` }) })
+        .subscribe({ complete: () => this.clearSession(), error: () => this.clearSession() });
+      return;
+    }
+    this.clearSession();
+  }
+
+  private clearSession(): void {
     localStorage.removeItem(this.tokenKey);
     localStorage.removeItem(this.userKey);
     localStorage.removeItem('whattocook_active_family');
+    this.householdContext.clear();
     this.router.navigateByUrl('/auth', { replaceUrl: true });
+  }
+
+  /** Restores the active accepted household when the app starts with a saved session. */
+  restoreHouseholdContext(): void {
+    if (!this.isAuthenticated || !this.user) return;
+    this.householdContext.refresh(this.user.id).subscribe({ error: () => this.householdContext.clear() });
   }
 
   private save(response: AuthResponse): void {
@@ -49,5 +67,6 @@ export class AuthService {
     if (previous?.id !== response.user.id) localStorage.removeItem('whattocook_active_family');
     localStorage.setItem(this.tokenKey, response.token);
     localStorage.setItem(this.userKey, JSON.stringify(response.user));
+    this.householdContext.refresh(response.user.id).subscribe({ error: () => this.householdContext.clear() });
   }
 }

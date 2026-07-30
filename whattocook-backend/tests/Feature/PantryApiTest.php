@@ -2,14 +2,14 @@
 
 namespace Tests\Feature;
 
-use App\Models\PantryItem;
 use App\Models\HouseholdProfile;
+use App\Models\PantryItem;
 use App\Models\User;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class PantryApiTest extends TestCase
@@ -131,6 +131,50 @@ class PantryApiTest extends TestCase
         }
     }
 
+    public function test_source_aware_estimates_keep_sari_sari_packaged_goods_reviewable_and_fresh_goods_conservative(): void
+    {
+        Carbon::setTestNow('2026-07-21 12:00:00');
+        try {
+            $user = User::factory()->create();
+
+            $packaged = $this->actingAs($user, 'sanctum')->postJson('/api/pantry', [
+                'name' => 'Canned Sardines', 'quantity' => 2, 'unit' => 'cans',
+                'purchase_source' => 'sari_sari_store',
+            ])->assertCreated()->json('item');
+
+            $fresh = $this->actingAs($user, 'sanctum')->postJson('/api/pantry', [
+                'name' => 'Pechay', 'quantity' => 1, 'unit' => 'bundle',
+                'purchase_source' => 'sari_sari_store',
+            ])->assertCreated()->json('item');
+
+            $this->assertSame('2027-01-21T00:00:00.000000Z', $packaged['expiry_date']);
+            $this->assertSame('2026-08-21T00:00:00.000000Z', $packaged['freshness_review_date']);
+            $this->assertSame('fresh', $packaged['freshness_status']);
+            $this->assertSame('low', $packaged['freshness_confidence']);
+            $this->assertSame('2026-07-22T00:00:00.000000Z', $fresh['freshness_review_date']);
+            $this->assertSame('review', $fresh['freshness_status']);
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    public function test_a_printed_expiry_added_during_update_replaces_the_estimate(): void
+    {
+        $user = User::factory()->create();
+        $item = $this->actingAs($user, 'sanctum')->postJson('/api/pantry', [
+            'name' => 'Tomatoes', 'quantity' => 4, 'unit' => 'pieces',
+        ])->assertCreated()->json('item');
+
+        $this->actingAs($user, 'sanctum')->putJson("/api/pantry/{$item['id']}", [
+            'expiry_date' => '2026-12-31',
+        ])->assertOk()
+            ->assertJsonPath('item.expiry_date', '2026-12-31T00:00:00.000000Z')
+            ->assertJsonPath('item.freshness_review_date', '2026-12-31T00:00:00.000000Z')
+            ->assertJsonPath('item.freshness_status', 'fresh')
+            ->assertJsonPath('item.freshness_confidence', 'high')
+            ->assertJsonPath('item.is_expiry_estimated', false);
+    }
+
     public function test_pantry_items_require_a_positive_quantity_and_unit(): void
     {
         $user = User::factory()->create();
@@ -151,6 +195,10 @@ class PantryApiTest extends TestCase
 
             $this->actingAs($user, 'sanctum')->getJson('/api/pantry')
                 ->assertOk()->assertJsonPath('0.id', $item->id)->assertJsonPath('0.freshness_status', 'review');
+            $this->assertDatabaseHas('pantry_items', ['id' => $item->id, 'freshness_status' => 'fresh']);
+
+            $this->artisan('pantry:refresh-freshness')->assertSuccessful();
+            $this->assertDatabaseHas('pantry_items', ['id' => $item->id, 'freshness_status' => 'review']);
         } finally {
             Carbon::setTestNow();
         }
@@ -195,6 +243,82 @@ class PantryApiTest extends TestCase
             ->assertCreated()->assertJsonPath('items.0.ingredient_name', 'Soy sauce');
     }
 
+    public function test_recipe_matching_sums_stock_converts_units_and_reports_the_actual_deficit(): void
+    {
+        $user = User::factory()->create();
+        PantryItem::create(['user_id' => $user->id, 'name' => 'Chicken breast', 'quantity' => '500', 'quantity_value' => 500, 'unit' => 'g', 'freshness_status' => 'fresh']);
+        PantryItem::create(['user_id' => $user->id, 'name' => 'Chicken thighs', 'quantity' => '0.5', 'quantity_value' => .5, 'unit' => 'kg', 'freshness_status' => 'fresh']);
+        $recipe = $this->actingAs($user, 'sanctum')->postJson('/api/recipes', [
+            'name' => 'Chicken Dish', 'instructions' => 'Cook.',
+            'ingredients' => [
+                ['name' => 'Chicken', 'quantity' => '1', 'unit' => 'kg'],
+                ['name' => 'Soy sauce', 'quantity' => '1/2', 'unit' => 'cup'],
+            ],
+        ])->json();
+
+        $this->actingAs($user, 'sanctum')->getJson("/api/recipes/{$recipe['id']}/match")
+            ->assertOk()
+            ->assertJsonPath('match_percentage', 50)
+            ->assertJsonPath('available_ingredients.0.pantry_quantity', 1)
+            ->assertJsonPath('missing_ingredients.0.missing_quantity', 0.5)
+            ->assertJsonPath('missing_ingredients.0.substitutes.0', 'tamari');
+
+        $this->actingAs($user, 'sanctum')->postJson("/api/recipes/{$recipe['id']}/shopping-list")
+            ->assertCreated()->assertJsonPath('items.0.quantity', 0.5);
+    }
+
+    public function test_recipe_matching_marks_recognised_stock_with_incompatible_units_for_review(): void
+    {
+        $user = User::factory()->create();
+        PantryItem::create(['user_id' => $user->id, 'name' => 'Bihon', 'quantity' => '4', 'quantity_value' => 4, 'unit' => 'packs', 'freshness_status' => 'fresh']);
+        $recipe = $this->actingAs($user, 'sanctum')->postJson('/api/recipes', [
+            'name' => 'Pancit Bihon', 'instructions' => 'Cook.',
+            'ingredients' => [['name' => 'Bihon noodles', 'quantity' => '250', 'unit' => 'g']],
+        ])->json();
+
+        $this->actingAs($user, 'sanctum')->getJson("/api/recipes/{$recipe['id']}/match")
+            ->assertOk()
+            ->assertJsonPath('needs_review_ingredients.0.name', 'Bihon noodles')
+            ->assertJsonPath('needs_review_ingredients.0.pantry_units.0', 'packs')
+            ->assertJsonCount(0, 'missing_ingredients');
+    }
+
+    public function test_confirmed_package_weight_is_reused_for_recipe_matching_and_not_shopped(): void
+    {
+        $user = User::factory()->create();
+        $item = PantryItem::create(['user_id' => $user->id, 'name' => 'Bihon noodles', 'quantity' => '4', 'quantity_value' => 4, 'unit' => 'packs', 'freshness_status' => 'fresh']);
+        $recipe = $this->actingAs($user, 'sanctum')->postJson('/api/recipes', [
+            'name' => 'Bihon meal', 'instructions' => 'Cook.',
+            'ingredients' => [['name' => 'Bihon noodles', 'quantity' => '750', 'unit' => 'g']],
+        ])->json();
+
+        $this->actingAs($user, 'sanctum')->postJson("/api/pantry/{$item->id}/package-conversion", ['amount_per_package' => 250, 'amount_unit' => 'g'])
+            ->assertOk()->assertJsonPath('conversion.amount_per_package', '250.000');
+        $this->actingAs($user, 'sanctum')->getJson("/api/recipes/{$recipe['id']}/match")
+            ->assertOk()->assertJsonPath('match_percentage', 100)->assertJsonCount(0, 'needs_review_ingredients')->assertJsonCount(0, 'missing_ingredients');
+        $this->actingAs($user, 'sanctum')->postJson("/api/recipes/{$recipe['id']}/shopping-list")
+            ->assertCreated()->assertJsonCount(0, 'items');
+    }
+
+    public function test_family_grocery_lists_use_shared_pantry_and_are_visible_to_other_members(): void
+    {
+        $owner = User::factory()->create();
+        $member = User::factory()->create();
+        $family = $this->actingAs($owner, 'sanctum')->postJson('/api/families', ['name' => 'Shared Grocery'])->json();
+        $invitation = $this->actingAs($owner, 'sanctum')->postJson("/api/families/{$family['id']}/members", ['email' => $member->email, 'role' => 'member'])->json('invitation');
+        $this->actingAs($member, 'sanctum')->postJson("/api/family-invitations/{$invitation['id']}/accept");
+        PantryItem::create(['user_id' => $owner->id, 'family_id' => $family['id'], 'name' => 'Rice', 'quantity' => '1', 'quantity_value' => 1, 'unit' => 'kg', 'freshness_status' => 'fresh']);
+        $recipe = $this->actingAs($owner, 'sanctum')->postJson('/api/recipes', [
+            'name' => 'Rice Meal', 'instructions' => 'Cook.',
+            'ingredients' => [['name' => 'Rice', 'quantity' => '2', 'unit' => 'kg']],
+        ])->json();
+
+        $this->actingAs($owner, 'sanctum')->postJson("/api/recipes/{$recipe['id']}/shopping-list", ['family_id' => $family['id']])
+            ->assertCreated()->assertJsonPath('items.0.quantity', 1);
+        $this->actingAs($member, 'sanctum')->getJson('/api/shopping-list')
+            ->assertOk()->assertJsonPath('0.ingredient_name', 'Rice');
+    }
+
     public function test_household_recommendations_use_shared_stock_and_exclude_member_allergies(): void
     {
         $owner = User::factory()->create();
@@ -217,7 +341,7 @@ class PantryApiTest extends TestCase
             ->assertJsonPath('recommendations.0.match_percentage', 100);
     }
 
-    public function test_household_pantry_scope_excludes_other_households(): void
+    public function test_household_pantry_scope_excludes_personal_and_other_household_stock(): void
     {
         $user = User::factory()->create();
         $first = $this->actingAs($user, 'sanctum')->postJson('/api/families', ['name' => 'First'])->json();
@@ -227,10 +351,22 @@ class PantryApiTest extends TestCase
         PantryItem::create(['user_id' => $user->id, 'name' => 'Salt']);
 
         $this->actingAs($user, 'sanctum')->getJson("/api/pantry?family_id={$first['id']}")
-            ->assertOk()->assertJsonCount(2)
+            ->assertOk()->assertJsonCount(1)
             ->assertJsonFragment(['name' => 'Rice'])
-            ->assertJsonFragment(['name' => 'Salt'])
+            ->assertJsonMissing(['name' => 'Salt'])
             ->assertJsonMissing(['name' => 'Pasta']);
+    }
+
+    public function test_usage_reason_is_stored_without_crossing_pantry_ownership(): void
+    {
+        $user = User::factory()->create();
+        $item = PantryItem::create(['user_id' => $user->id, 'name' => 'Rice', 'quantity' => '2', 'quantity_value' => 2, 'unit' => 'kg', 'freshness_status' => 'fresh']);
+
+        $this->actingAs($user, 'sanctum')->patchJson("/api/pantry/{$item->id}/freshness", [
+            'action' => 'used', 'used_quantity' => 0.5, 'usage_reason' => 'Dinner prep',
+        ])->assertOk()->assertJsonPath('item.quantity_value', '1.500')->assertJsonPath('item.last_usage_reason', 'Dinner prep');
+
+        $this->assertDatabaseHas('pantry_items', ['id' => $item->id, 'family_id' => null, 'last_usage_reason' => 'Dinner prep']);
     }
 
     public function test_an_authenticated_user_can_search_usda_food_data(): void
@@ -263,6 +399,39 @@ class PantryApiTest extends TestCase
             'receipt' => UploadedFile::fake()->create('receipt.jpg', 100, 'image/jpeg'), 'recognized_text' => "1 kg rice\nTOTAL 100",
         ])->assertCreated()->assertJsonPath('candidates.0.name', 'Rice')->assertJsonPath('candidates.0.unit', 'kg');
 
+        $this->assertDatabaseCount('pantry_items', 0);
+    }
+
+    public function test_chair_is_rejected_server_side_and_cannot_be_saved_to_the_pantry(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user, 'sanctum')->postJson('/api/ingredients/resolve', ['name' => 'chair'])
+            ->assertOk()->assertJsonPath('status', 'rejected');
+        $this->actingAs($user, 'sanctum')->postJson('/api/pantry', ['name' => 'chair', 'quantity' => 1, 'unit' => 'pieces'])
+            ->assertUnprocessable()->assertJsonValidationErrors('name');
+        $this->assertDatabaseMissing('pantry_items', ['name' => 'chair']);
+    }
+
+    public function test_bihon_requires_an_alias_confirmation_before_the_canonical_name_can_be_saved(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user, 'sanctum')->postJson('/api/ingredients/resolve', ['name' => 'bihon'])
+            ->assertOk()->assertJsonPath('status', 'suggested')->assertJsonPath('suggestion.canonical_name', 'bihon noodles');
+        $this->actingAs($user, 'sanctum')->postJson('/api/pantry', ['name' => 'bihon', 'quantity' => 1, 'unit' => 'packs'])
+            ->assertUnprocessable()->assertJsonValidationErrors('name');
+        $this->actingAs($user, 'sanctum')->postJson('/api/pantry', ['name' => 'bihon noodles', 'quantity' => 1, 'unit' => 'packs'])
+            ->assertCreated()->assertJsonPath('item.name', 'bihon noodles');
+    }
+
+    public function test_voice_and_receipt_candidates_are_split_and_invalid_terms_are_rejected_not_review_drafts(): void
+    {
+        $user = User::factory()->create();
+        $voice = $this->actingAs($user, 'sanctum')->postJson('/api/pantry-inputs/voice', ['transcript' => '2 eggs and bihon and chair'])
+            ->assertOk()->assertJsonCount(1, 'accepted')->assertJsonCount(1, 'suggested')->assertJsonCount(1, 'rejected')
+            ->assertJsonPath('rejected.0.name', 'Chair')->assertJsonPath('suggested.0.suggestion.canonical_name', 'bihon noodles')->json();
+        $this->assertCount(2, $voice['candidates']);
+        $this->actingAs($user, 'sanctum')->postJson('/api/pantry-inputs/receipt-text', ['text' => "Tuna\nChair"])
+            ->assertOk()->assertJsonCount(1, 'accepted')->assertJsonCount(1, 'rejected')->assertJsonCount(1, 'candidates');
         $this->assertDatabaseCount('pantry_items', 0);
     }
 

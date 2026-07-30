@@ -13,6 +13,7 @@ class PantryItem extends Model
         'quantity',
         'quantity_value',
         'last_used_quantity',
+        'last_usage_reason',
         'unit',
         'purchase_date',
         'expiry_date',

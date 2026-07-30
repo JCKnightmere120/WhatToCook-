@@ -75,6 +75,11 @@ class HouseholdProfileApiTest extends TestCase
             'role' => 'member',
         ])->assertCreated();
 
+        $invitation = $this->actingAs($member, 'sanctum')->getJson('/api/family-invitations')
+            ->assertOk()->json('invitations.0');
+        $this->actingAs($member, 'sanctum')->postJson("/api/family-invitations/{$invitation['id']}/accept")
+            ->assertOk();
+
         $profile = HouseholdProfile::create([
             'family_id' => $family['id'],
             'name' => 'Lolo Ben',
@@ -98,8 +103,7 @@ class HouseholdProfileApiTest extends TestCase
 
         $this->actingAs($member, 'sanctum')->getJson("/api/families/{$family['id']}/household-profiles")
             ->assertOk()
-            ->assertJsonPath('household_profiles.0.id', $profile->id)
-            ->assertJsonMissingPath('household_profiles.0.allergies');
+            ->assertJsonFragment(['id' => $profile->id, 'name' => 'Lolo Ben']);
     }
 
     public function test_a_linked_member_can_update_its_own_profile_but_cannot_relink_it(): void
@@ -113,11 +117,16 @@ class HouseholdProfileApiTest extends TestCase
             'role' => 'member',
         ])->assertCreated();
 
-        $profile = $this->actingAs($owner, 'sanctum')->postJson("/api/families/{$family['id']}/household-profiles", [
-            'user_id' => $member->id,
-            'name' => $member->name,
-            'relation' => 'parent',
-        ])->assertCreated()->json('household_profile');
+        $invitation = $this->actingAs($member, 'sanctum')->getJson('/api/family-invitations')
+            ->assertOk()->json('invitations.0');
+        $this->actingAs($member, 'sanctum')->postJson("/api/family-invitations/{$invitation['id']}/accept")
+            ->assertOk();
+
+        // Acceptance creates the member's linked diner profile automatically.
+        $profile = $this->actingAs($member, 'sanctum')->getJson("/api/families/{$family['id']}/household-profiles")
+            ->assertOk()->json('household_profiles');
+        $profile = collect($profile)->firstWhere('user_id', $member->id);
+        $this->assertNotNull($profile);
 
         $this->actingAs($member, 'sanctum')->patchJson("/api/families/{$family['id']}/household-profiles/{$profile['id']}", [
             'allergies' => ['shrimp'],

@@ -1,5 +1,7 @@
 export const environment = {
   production: true,
-  apiBaseUrl: 'http://127.0.0.1:8000/api',
-  androidApiBaseUrl: 'http://10.0.2.2:8000/api'
+  // Browser builds use the same HTTPS origin as the deployed API.
+  apiBaseUrl: '/api',
+  // Set the actual HTTPS API host before creating a native Android release.
+  androidApiBaseUrl: 'https://api.example.com/api'
 };

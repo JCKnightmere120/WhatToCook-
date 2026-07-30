@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\HouseholdProfile;
 use Illuminate\Http\Request;
 
 class ProfileController extends Controller
@@ -15,6 +16,13 @@ class ProfileController extends Controller
             'dietary_restrictions' => 'sometimes|array', 'likes' => 'sometimes|array',
             'dislikes' => 'sometimes|array', 'visible_to_family' => 'sometimes|array',
         ]);
-        return response()->json($request->user()->profile()->updateOrCreate([], $data));
+        $profile = $request->user()->profile()->updateOrCreate([], $data);
+
+        // A signed-in person's health and food rules have one source of truth.
+        // Mirror changes into every linked household diner profile so family
+        // recommendations cannot become less strict than personal planning.
+        HouseholdProfile::where('user_id', $request->user()->id)->update($data);
+
+        return response()->json($profile);
     }
 }

@@ -1,0 +1,62 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\PantryItem;
+use App\Models\Recipe;
+use Carbon\Carbon;
+use Illuminate\Support\Collection;
+
+/** A stable, inspectable ranking policy. Safety exclusions always happen before scoring. */
+class DeterministicMealRanker
+{
+    public function rank(Collection $recipes, Collection $profiles, Collection $pantry, Collection $history, array $options, array $alreadyChosen = []): Collection
+    {
+        $blocked = $profiles->flatMap(fn ($p) => array_merge($p->allergies ?? [], $p->dietary_restrictions ?? []))
+            ->map(fn ($v) => strtolower(trim($v)))->filter()->unique();
+        if ($blocked->contains('vegetarian')) $blocked = $blocked->merge(['chicken', 'pork', 'beef', 'fish', 'seafood', 'meat']);
+        if ($blocked->contains('vegan')) $blocked = $blocked->merge(['egg', 'milk', 'dairy']);
+        $likes = $profiles->flatMap(fn ($p) => $p->likes ?? [])->map(fn ($v) => strtolower($v));
+        $dislikes = $profiles->flatMap(fn ($p) => $p->dislikes ?? [])->map(fn ($v) => strtolower($v));
+        $isYoungChild = $profiles->contains(fn ($p) => in_array($p->age_band ?? null, ['0-5_months', '6-11_months', '1_year', '2-5_years'], true));
+        $strict = ($options['time_preference'] ?? 'flexible') === 'strict';
+        $budget = $this->budget($options['cooking_time_budget'] ?? '60');
+
+        return $recipes->filter(function (Recipe $recipe) use ($blocked, $isYoungChild) {
+            $terms = $this->terms($recipe);
+            if ($blocked->contains(fn ($term) => $terms->contains(fn ($text) => str_contains($text, $term)))) return false;
+            // Conservative child rule: recipes with alcohol or explicitly very spicy ingredients are not auto-selected.
+            return ! $isYoungChild || ! $terms->contains(fn ($text) => str_contains($text, 'alcohol') || str_contains($text, 'siling labuyo'));
+        })->filter(fn (Recipe $recipe) => ! $strict || $this->minutes($recipe) <= $budget)
+            ->map(function (Recipe $recipe) use ($pantry, $history, $alreadyChosen, $likes, $dislikes, $budget, $strict) {
+                $terms = $this->terms($recipe);
+                $ingredientNames = $recipe->ingredients->pluck('name')->map(fn ($v) => strtolower($v));
+                $nutrition = min(30, (($recipe->protein ?? 0) / 2) + (($recipe->calories ?? 0) >= 180 && ($recipe->calories ?? 0) <= 650 ? 8 : 0));
+                $expiryHits = $pantry->filter(fn (PantryItem $item) => $item->expiry_date && Carbon::parse($item->expiry_date)->betweenIncluded(now(), now()->copy()->addDays(3)))
+                    ->filter(fn ($item) => $ingredientNames->contains(fn ($name) => str_contains(strtolower($item->name), $name) || str_contains($name, strtolower($item->name))))->count();
+                $pantryHits = $pantry->filter(fn ($item) => $ingredientNames->contains(fn ($name) => str_contains(strtolower($item->name), $name) || str_contains($name, strtolower($item->name))))->count();
+                $minutes = $this->minutes($recipe);
+                $likeScore = $likes->filter(fn ($term) => $terms->contains(fn ($text) => str_contains($text, $term)))->count() * 6;
+                $dislikePenalty = $dislikes->filter(fn ($term) => $terms->contains(fn ($text) => str_contains($text, $term)))->count() * 12;
+                $repeatPenalty = (in_array($recipe->id, $alreadyChosen, true) ? 45 : 0) + ($history->contains('recipe_id', $recipe->id) ? 15 : 0);
+                $timeScore = $strict ? 0 : max(0, 12 - abs($budget - $minutes) / 5);
+                $recipe->ranking = ['nutrition' => round($nutrition, 1), 'pantry' => $pantryHits * 5, 'expiry' => $expiryHits * 12, 'time' => round($timeScore, 1), 'preference' => $likeScore - $dislikePenalty, 'variety_penalty' => $repeatPenalty, 'score' => round($nutrition + $pantryHits * 5 + $expiryHits * 12 + $timeScore + $likeScore - $dislikePenalty - $repeatPenalty, 1)];
+                $recipe->why_chosen = $this->why($recipe, $expiryHits, $pantryHits, $minutes, $budget, $alreadyChosen);
+                return $recipe;
+            })->sort(function (Recipe $a, Recipe $b) {
+                $score = $b->ranking['score'] <=> $a->ranking['score'];
+                return $score ?: ($a->id <=> $b->id);
+            })->values();
+    }
+
+    private function terms(Recipe $recipe): Collection { return $recipe->ingredients->pluck('name')->push($recipe->name)->map(fn ($v) => strtolower((string) $v)); }
+    private function minutes(Recipe $recipe): int { return (int) ($recipe->prep_time ?? 0) + (int) ($recipe->cook_time ?? 0); }
+    private function budget(string|int $value): int { return $value === '90+' ? 999 : (int) $value; }
+    private function why(Recipe $r, int $expiry, int $pantry, int $minutes, int $budget, array $chosen): array {
+        $why = ['Passed allergy, dietary, and age safety checks.', 'Nutrition score: '.$r->ranking['nutrition'].'.'];
+        if ($expiry) $why[] = "Uses {$expiry} pantry ingredient(s) nearing expiry."; elseif ($pantry) $why[] = "Uses {$pantry} ingredient(s) already in the pantry.";
+        if ($minutes <= $budget) $why[] = "Estimated {$minutes} minutes fits the selected time preference.";
+        if (!in_array($r->id, $chosen, true)) $why[] = 'Avoids repeating an earlier meal in this draft.';
+        return $why;
+    }
+}

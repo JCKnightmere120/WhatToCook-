@@ -29,7 +29,7 @@ class AuthController extends Controller
         return response()->json([
             'user' => $user,
             'token' => $token,
-            'message' => 'Registration successful!'
+            'message' => 'Registration successful!',
         ], 201);
     }
 
@@ -43,7 +43,7 @@ class AuthController extends Controller
 
         $user = User::where('email', $request->email)->first();
 
-        if (!$user || !Hash::check($request->password, $user->password)) {
+        if (! $user || ! Hash::check($request->password, $user->password)) {
             throw ValidationException::withMessages([
                 'email' => ['Invalid credentials.'],
             ]);
@@ -54,17 +54,19 @@ class AuthController extends Controller
         return response()->json([
             'user' => $user,
             'token' => $token,
-            'message' => 'Login successful!'
+            'message' => 'Login successful!',
         ]);
     }
 
     // Logout
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
+        // Revoke all of the account's bearer tokens. This makes logout effective
+        // even when the current request was authenticated through a session.
+        $request->user()->tokens()->delete();
 
         return response()->json([
-            'message' => 'Logged out successfully!'
+            'message' => 'Logged out successfully!',
         ]);
     }
 
