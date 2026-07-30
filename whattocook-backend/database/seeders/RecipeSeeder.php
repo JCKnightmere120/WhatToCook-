@@ -274,7 +274,17 @@ class RecipeSeeder extends Seeder
             $ingredients = $recipe['ingredients'];
             unset($recipe['ingredients']);
 
+<<<<<<< HEAD
             Recipe::create($recipe)->ingredients()->createMany($ingredients);
         }
     }
 }
+=======
+            $model = Recipe::firstOrCreate(['name' => $recipe['name']], $recipe);
+            if ($model->wasRecentlyCreated) {
+                $model->ingredients()->createMany($ingredients);
+            }
+        }
+    }
+}
+>>>>>>> origin

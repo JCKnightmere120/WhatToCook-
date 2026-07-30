@@ -1,0 +1,179 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/tabs/meal-plan"></ion-back-button>
+    </ion-buttons>
+    <ion-title>New meal plan</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <main class="page">
+    <ion-spinner *ngIf="loading" class="loading" aria-label="Loading plan options"></ion-spinner>
+
+    <ng-container *ngIf="!loading">
+      <p class="intro">Set up a draft first. You can inspect the proposed meals and ingredients before anything is added to your calendar.</p>
+      <ion-text color="danger" *ngIf="message"><p class="message">{{ message }}</p></ion-text>
+
+      <ion-list inset="true">
+        <ion-list-header>
+          <ion-label>Plan scope</ion-label>
+        </ion-list-header>
+        <ion-item>
+          <ion-select label="Planning for" labelPlacement="stacked" [(ngModel)]="contextId" (ionChange)="onContextChange()">
+            <ion-select-option value="personal">My personal plan</ion-select-option>
+            <ion-select-option *ngFor="let family of families" [value]="family.id">{{ family.name }}</ion-select-option>
+          </ion-select>
+        </ion-item>
+      </ion-list>
+
+      <ion-list inset="true">
+        <ion-list-header>
+          <ion-label>Plan period</ion-label>
+        </ion-list-header>
+        <ion-item>
+          <ion-input label="Start date" labelPlacement="stacked" type="date" [min]="minimumDate" [(ngModel)]="startDate"></ion-input>
+        </ion-item>
+        <ion-item>
+          <ion-input label="End date" labelPlacement="stacked" type="date" [min]="startDate || minimumDate" [(ngModel)]="endDate"></ion-input>
+        </ion-item>
+        <ion-item>
+          <ion-note color="medium">Choose any range from today up to 56 days (8 weeks).</ion-note>
+        </ion-item>
+      </ion-list>
+
+      <ion-list inset="true">
+        <ion-list-header>
+          <ion-label>Meals to include</ion-label>
+        </ion-list-header>
+        <ion-item *ngFor="let meal of mealTypes">
+          <ion-checkbox slot="start" [checked]="isMealTypeSelected(meal.value)" (ionChange)="toggleMealType(meal.value)"></ion-checkbox>
+          <ion-label>{{ meal.label }}</ion-label>
+        </ion-item>
+      </ion-list>
+
+      <ion-list inset="true">
+        <ion-list-header><ion-label>Cooking preferences</ion-label></ion-list-header>
+        <ion-item><ion-select label="Cooking-time budget" labelPlacement="stacked" [(ngModel)]="cookingTimeBudget"><ion-select-option value="15">15 minutes</ion-select-option><ion-select-option value="30">30 minutes</ion-select-option><ion-select-option value="45">45 minutes</ion-select-option><ion-select-option value="60">60 minutes</ion-select-option><ion-select-option value="90+">90+ minutes</ion-select-option></ion-select></ion-item>
+        <ion-item><ion-select label="Time limit" labelPlacement="stacked" [(ngModel)]="timePreference"><ion-select-option value="strict">Strict — exclude meals over budget</ion-select-option><ion-select-option value="flexible">Flexible — prefer the budget</ion-select-option></ion-select></ion-item>
+        <ion-item><ion-select label="Leftovers / meal pattern" labelPlacement="stacked" [(ngModel)]="leftoverStrategy"><ion-select-option value="avoid_leftovers">Different meals where possible</ion-select-option><ion-select-option value="reuse_ulam">Reuse one ulam across requested meals</ion-select-option><ion-select-option value="main_with_rice_side">Main dish with rice or side</ion-select-option></ion-select></ion-item>
+        <ion-item><ion-note color="medium">The planner ranks safely first, then nutrition, pantry and expiry use, time, preferences, variety, and waste reduction.</ion-note></ion-item>
+      </ion-list>
+
+      <ion-list inset="true" *ngIf="household; else personalProfile">
+        <ion-list-header>
+          <ion-label>Who is eating?</ion-label>
+        </ion-list-header>
+        <ng-container *ngFor="let diner of diners">
+          <ion-item>
+            <ion-checkbox slot="start" [checked]="isDinerSelected(diner.id)" (ionChange)="setDinerSelected(diner.id, $event.detail.checked)"></ion-checkbox>
+            <ion-label>
+              <h2>{{ diner.name }}</h2>
+              <p>{{ diner.relation || 'Household diner' }}</p>
+            </ion-label>
+            <ion-select slot="end" aria-label="Attendance for {{ diner.name }}" [value]="attendanceFor(diner.id)" [disabled]="!isDinerSelected(diner.id)" (ionChange)="setAttendance(diner.id, $event.detail.value, diner)">
+              <ion-select-option *ngFor="let option of attendanceOptions" [value]="option.value">{{ option.label }}</ion-select-option>
+            </ion-select>
+          </ion-item>
+          <ion-item class="specific-days" button detail="true" *ngIf="isDinerSelected(diner.id) && attendanceFor(diner.id) === 'specific_days'" (click)="openAttendanceEditor(diner)">
+            <ion-icon name="calendar-outline" slot="start"></ion-icon>
+            <ion-label>
+              <h3>Choose dates</h3>
+              <p>{{ specificDaysSummary(diner.id) }}</p>
+            </ion-label>
+          </ion-item>
+          <ion-item *ngIf="isDinerSelected(diner.id) && isYoungChild(diner)">
+            <ion-select [(ngModel)]="childMealModes[diner.id]" label="Child meal" labelPlacement="stacked" interface="action-sheet">
+              <ion-select-option value="family_meal_with_adaptation">Family meal with child adaptation</ion-select-option>
+              <ion-select-option value="separate_child_meal">Separate child meal</ion-select-option>
+              <ion-select-option value="exclude">Exclude child from this plan</ion-select-option>
+            </ion-select>
+          </ion-item>
+        </ng-container>
+        <ion-item *ngIf="!diners.length">
+          <ion-label>
+            <h2>No diner profiles yet</h2>
+            <p>Add each person who eats in this household before generating a shared plan.</p>
+          </ion-label>
+          <ion-button slot="end" fill="outline" routerLink="/family">Family</ion-button>
+        </ion-item>
+        <ion-item>
+          <ion-note color="medium">Attendance is applied to every date in this plan. For example, select “Weekends only” for a family member who comes home on weekends.</ion-note>
+        </ion-item>
+      </ion-list>
+
+      <ng-template #personalProfile>
+        <ion-list inset="true">
+          <ion-list-header>
+            <ion-label>Personal profile</ion-label>
+          </ion-list-header>
+          <ion-item>
+            <ion-label>
+              <h2>Just for you</h2>
+              <p>Your own allergies, dietary restrictions, likes, and dislikes are used automatically.</p>
+            </ion-label>
+          </ion-item>
+        </ion-list>
+      </ng-template>
+
+      <ion-list inset="true">
+        <ion-list-header>
+          <ion-label>Servings</ion-label>
+        </ion-list-header>
+        <ion-item>
+          <ion-input label="Servings per meal" labelPlacement="stacked" type="number" min="1" max="100" [(ngModel)]="servings"></ion-input>
+        </ion-item>
+        <ion-item *ngIf="household">
+          <ion-note color="medium">Adult diners count as full servings. Young children use smaller portions automatically; review the child notes before cooking.</ion-note>
+        </ion-item>
+      </ion-list>
+
+      <ion-button expand="block" (click)="generate()" [disabled]="generating">
+        {{ generating ? 'Generating draft…' : 'Generate draft' }}
+      </ion-button>
+    </ng-container>
+  </main>
+</ion-content>
+
+<ion-toast
+  [isOpen]="!!message"
+  header="Couldn't generate plan"
+  [message]="message"
+  [duration]="6000"
+  color="danger"
+  position="top"
+  (didDismiss)="message = ''">
+</ion-toast>
+
+<ion-alert
+  [isOpen]="showConflictChoice"
+  header="Meals already planned"
+  [message]="conflictMessage + ' Generating a new draft will not change these meals. You can keep or replace each conflicting meal during review.'"
+  [buttons]="conflictAlertButtons"
+  (didDismiss)="showConflictChoice = false">
+</ion-alert>
+
+<ion-modal [isOpen]="!!attendanceEditor" [backdropDismiss]="false" (didDismiss)="cancelSpecificDays()">
+  <ng-template>
+    <ion-header>
+      <ion-toolbar>
+        <ion-title>Choose attendance dates</ion-title>
+        <ion-buttons slot="end"><ion-button (click)="cancelSpecificDays()">Cancel</ion-button></ion-buttons>
+      </ion-toolbar>
+    </ion-header>
+    <ion-content class="ion-padding" *ngIf="attendanceEditor">
+      <p class="date-picker-intro">Select the dates when <strong>{{ attendanceEditor.diner.name }}</strong> will eat from this plan.</p>
+      <ion-list inset="true">
+        <ion-item *ngFor="let date of datesInRange()">
+          <ion-checkbox slot="start" [checked]="isEditorDateSelected(date)" (ionChange)="toggleEditorDate(date, $event.detail.checked)"></ion-checkbox>
+          <ion-label>{{ dateLabel(date) }}</ion-label>
+        </ion-item>
+      </ion-list>
+    </ion-content>
+    <ion-footer>
+      <ion-toolbar>
+        <ion-button expand="block" (click)="saveSpecificDays()">Save selected days</ion-button>
+      </ion-toolbar>
+    </ion-footer>
+  </ng-template>
+</ion-modal>

@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -20,7 +19,11 @@ class DatabaseSeeder extends Seeder
             ['name' => 'Test User']
         );
 
+<<<<<<< HEAD
         $this->call(RecipeSeeder::class);
         $this->call(AdminUserSeeder::class);
+=======
+        $this->call([RecipeSeeder::class, IngredientCatalogSeeder::class]);
+>>>>>>> origin
     }
 }

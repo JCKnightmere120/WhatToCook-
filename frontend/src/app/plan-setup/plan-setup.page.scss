@@ -1,0 +1,32 @@
+.page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.intro,
+.message {
+  line-height: 1.5;
+}
+
+.intro {
+  margin: 0 0 16px;
+}
+
+.message {
+  margin: 0 0 12px;
+}
+
+.loading {
+  display: block;
+  margin: 48px auto;
+}
+
+ion-list {
+  margin-bottom: 16px;
+}
+
+ion-note {
+  white-space: normal;
+  line-height: 1.4;
+}
