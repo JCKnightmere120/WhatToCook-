@@ -69,6 +69,13 @@ class HouseholdProfileController extends Controller
 
         $this->validateLinkedUser($family, $data, $householdProfile);
         $householdProfile->update($data);
+        if ($householdProfile->user_id !== null && (int) $householdProfile->user_id === (int) $request->user()->id) {
+            $personalFields = collect($data)->only(self::PRIVATE_FIELDS)->all();
+            if ($personalFields) {
+                $request->user()->profile()->updateOrCreate([], $personalFields);
+                HouseholdProfile::where('user_id', $request->user()->id)->update($personalFields);
+            }
+        }
 
         return response()->json([
             'household_profile' => $this->forViewer($householdProfile->fresh(), $request, $family),
@@ -126,6 +133,7 @@ class HouseholdProfileController extends Controller
         $isFamilyMember = FamilyMember::where([
             'family_id' => $family->id,
             'user_id' => $data['user_id'],
+            'status' => 'accepted',
         ])->exists();
 
         if (! $isFamilyMember) {
@@ -178,6 +186,7 @@ class HouseholdProfileController extends Controller
         abort_unless(FamilyMember::where([
             'family_id' => $family->id,
             'user_id' => $request->user()->id,
+            'status' => 'accepted',
         ])->exists(), 403);
     }
 

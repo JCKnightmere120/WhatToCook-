@@ -30,12 +30,17 @@ export class FamilyPage {
   ionViewWillEnter(): void { this.load(); }
   get isOwner(): boolean { return !!this.selected && this.selected.owner_id === this.auth.user?.id; }
   canManage(profile: HouseholdProfile): boolean { return this.isOwner || profile.user_id === this.auth.user?.id; }
+  ageBandLabel(profile: HouseholdProfile): string {
+    return ({ '0-5_months': '0–5 months', '6-11_months': '6–11 months', '12-23_months': '12–23 months', '2-5_years': '2–5 years', '6_plus_years': '6+ years' } as Record<string, string>)[profile.age_band || ''] || '';
+  }
 
   load(): void {
     this.loading = true;
     this.householdContext.refresh(this.auth.user?.id).subscribe({ next: context => {
       this.families = context.families;
-      this.selected = context.activeFamily || undefined;
+      // Family management must remain reachable even when the global app
+      // context is intentionally set to Personal.
+      this.selected = context.activeFamily || context.families[0] || undefined;
       if (this.selected) this.loadProfiles(); else this.loading = false;
     }, error: () => { this.message = 'Could not load your family accounts.'; this.loading = false; } });
   }

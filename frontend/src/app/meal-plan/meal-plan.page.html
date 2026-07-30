@@ -1,2 +1,118 @@
-<ion-header><ion-toolbar><ion-title>Weekly meal plan</ion-title></ion-toolbar></ion-header>
-<ion-content><div class="page"><div class="calendar-icon"><ion-icon name="calendar"></ion-icon></div><h1>Plan meals for your household</h1><p>Select who is eating, then build a week around their needs and your shared pantry.</p><ion-card><ion-card-content><strong>Family planner is next</strong><span>This screen will use the selected members’ restrictions, preferences, nutrition targets, and family size.</span></ion-card-content></ion-card></div></ion-content>
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Meal planner</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="load()" aria-label="Refresh planner"><ion-icon name="refresh-outline"></ion-icon></ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <main class="page">
+    <p class="message" *ngIf="message">{{ message }}</p>
+    <ion-spinner *ngIf="loading" class="spinner"></ion-spinner>
+
+    <ng-container *ngIf="!loading">
+      <section class="planner-heading">
+        <p class="intro">Choose a personal plan or the shared household you want to manage.</p>
+        <ion-item lines="none" class="context-picker">
+          <ion-icon name="people-outline" slot="start"></ion-icon>
+          <ion-select label="Planning for" [(ngModel)]="contextId" (ionChange)="changeContext()">
+            <ion-select-option value="personal">My personal plan</ion-select-option>
+            <ion-select-option *ngFor="let family of families" [value]="family.id">{{ family.name }}</ion-select-option>
+          </ion-select>
+        </ion-item>
+      </section>
+
+      <div class="planner-controls">
+        <ion-item lines="none">
+          <ion-select label="View" [(ngModel)]="periodWeeks" (ionChange)="changePeriod()">
+            <ion-select-option [value]="1">1 week</ion-select-option>
+            <ion-select-option [value]="2">2 weeks</ion-select-option>
+            <ion-select-option [value]="4">4 weeks</ion-select-option>
+          </ion-select>
+        </ion-item>
+      </div>
+
+      <div class="week-nav">
+        <ion-button fill="clear" (click)="previousPeriod()" aria-label="Previous period"><ion-icon name="chevron-back-outline"></ion-icon></ion-button>
+        <button type="button" (click)="currentPeriod()">{{ periodLabel() }}</button>
+        <ion-button fill="clear" (click)="nextPeriod()" aria-label="Next period"><ion-icon name="chevron-forward-outline"></ion-icon></ion-button>
+      </div>
+
+      <p class="notice" *ngIf="household && !diners.length">Add diner profiles in Family before scheduling shared meals.</p>
+
+      <section class="week" aria-label="Meal schedule">
+        <article class="day" *ngFor="let day of days">
+          <header><span>{{ dateLabel(day) }}</span><strong>{{ dayNumber(day) }}</strong></header>
+          <div class="slot" *ngFor="let type of mealTypes">
+            <span class="meal-type">{{ type }}</span>
+            <ng-container *ngIf="planFor(day, type) as plan; else addMeal">
+              <button type="button" class="planned" (click)="openSlot(day, type, plan)">
+                <strong>{{ recipeName(plan) }}</strong>
+                <small>{{ servingsFor(plan) }} servings · {{ dinersFor(plan) }}</small>
+              </button>
+              <ion-button size="small" fill="clear" (click)="openMealDetails(plan)">
+                {{ isCooked(plan) ? 'View meal details' : 'Check ingredients & cook' }}
+              </ion-button>
+              <ion-button *ngIf="!isCooked(plan)" size="small" fill="clear" color="danger" (click)="requestRemove(plan)" aria-label="Delete {{ recipeName(plan) }}">
+                <ion-icon name="trash-outline" slot="start"></ion-icon> Delete
+              </ion-button>
+              <small class="cooked" *ngIf="isCooked(plan)">Cooked</small>
+            </ng-container>
+            <ng-template #addMeal>
+              <button type="button" class="add" [disabled]="household && !diners.length" (click)="openSlot(day, type)">
+                <ion-icon name="add-outline"></ion-icon> Add meal
+              </button>
+            </ng-template>
+          </div>
+        </article>
+      </section>
+    </ng-container>
+  </main>
+</ion-content>
+
+<ion-footer class="planner-footer" *ngIf="!loading">
+  <ion-toolbar>
+    <ion-button expand="block" (click)="openGeneration()">
+      <ion-icon slot="start" name="sparkles-outline"></ion-icon>
+      Generate plan
+    </ion-button>
+  </ion-toolbar>
+</ion-footer>
+
+<ion-modal [isOpen]="!!draft" (didDismiss)="closeEditor()">
+  <ng-template>
+    <ion-header>
+      <ion-toolbar>
+        <ion-title>{{ draft?.planId ? 'Edit' : 'Plan' }} {{ draft?.mealType }}</ion-title>
+        <ion-buttons slot="end"><ion-button (click)="closeEditor()">Close</ion-button></ion-buttons>
+      </ion-toolbar>
+    </ion-header>
+    <ion-content class="editor ion-padding" *ngIf="draft">
+      <p>{{ draft.date | date:'EEEE, MMMM d' }}</p>
+      <ion-list>
+        <ion-item>
+          <ion-select label="Recipe" labelPlacement="stacked" placeholder="Select a recipe" [(ngModel)]="draft.recipeId">
+            <ion-select-option *ngFor="let item of recipes" [value]="item.recipe.id">{{ item.recipe.name }} · {{ item.match_percentage }}% pantry match</ion-select-option>
+          </ion-select>
+        </ion-item>
+        <ion-item><ion-input label="Servings" labelPlacement="stacked" type="number" min="1" [(ngModel)]="draft.servings"></ion-input></ion-item>
+      </ion-list>
+      <ng-container *ngIf="household">
+        <h2>Who is eating?</h2>
+        <ion-list>
+          <ion-item *ngFor="let diner of diners">
+            <ion-checkbox slot="start" [checked]="draft.dinerIds.includes(diner.id)" (ionChange)="toggleDiner(diner.id)"></ion-checkbox>
+            <ion-label>{{ diner.name }}<p *ngIf="diner.relation">{{ diner.relation }}</p></ion-label>
+          </ion-item>
+        </ion-list>
+      </ng-container>
+      <p class="helper">{{ household ? 'Diners, servings, and dietary checks are saved with this shared meal.' : 'This meal is for your personal profile; your dietary restrictions are enforced when it is saved.' }}</p>
+      <ion-button expand="block" [disabled]="saving" (click)="save()">{{ saving ? 'Saving…' : 'Save meal' }}</ion-button>
+      <ion-button *ngIf="draft.planId" expand="block" fill="outline" color="danger" (click)="remove()">Remove meal</ion-button>
+    </ion-content>
+  </ng-template>
+</ion-modal>
+
+<ion-alert [isOpen]="!!deleteCandidate" header="Delete this planned meal?" [message]="'Remove ' + (deleteCandidate ? recipeName(deleteCandidate) : 'this meal') + ' from the plan? This does not delete the recipe.'" [buttons]="deleteAlertButtons" (didDismiss)="deleteCandidate = undefined"></ion-alert>

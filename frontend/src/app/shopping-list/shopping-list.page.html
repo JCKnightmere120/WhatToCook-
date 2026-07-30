@@ -1,0 +1,38 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start"><ion-back-button defaultHref="/tabs/more"></ion-back-button></ion-buttons>
+    <ion-title>Shopping list</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <main class="page">
+    <p *ngIf="household">Shared with {{ household.name }}</p>
+    <p class="message" *ngIf="message">{{ message }}</p>
+
+    <ion-card>
+      <ion-card-content>
+        <ion-input label="Ingredient" labelPlacement="stacked" [(ngModel)]="name"></ion-input>
+        <ion-grid><ion-row><ion-col><ion-input label="Quantity" labelPlacement="stacked" [(ngModel)]="quantity"></ion-input></ion-col><ion-col><ion-input label="Unit" labelPlacement="stacked" [(ngModel)]="unit"></ion-input></ion-col></ion-row></ion-grid>
+        <ion-button expand="block" (click)="add()">Add item</ion-button>
+      </ion-card-content>
+    </ion-card>
+
+    <section class="purchase-tools" *ngIf="!loading && items.length">
+      <ion-note>{{ remainingItems.length }} item{{ remainingItems.length === 1 ? '' : 's' }} remaining</ion-note>
+      <ion-button size="small" fill="outline" (click)="confirmMarkAll = true" [disabled]="!remainingItems.length || markingAll">{{ markingAll ? 'Updating…' : 'Mark all remaining bought' }}</ion-button>
+    </section>
+
+    <ion-spinner *ngIf="loading"></ion-spinner>
+    <ion-list *ngIf="!loading">
+      <ion-item *ngFor="let item of items">
+        <ion-checkbox slot="start" [checked]="item.is_purchased" (ionChange)="toggle(item)" aria-label="Mark {{ item.ingredient_name }} as bought"></ion-checkbox>
+        <ion-label [class.done]="item.is_purchased">{{ item.ingredient_name }}<p>{{ item.quantity || '' }} {{ item.unit || '' }}</p></ion-label>
+        <ion-button fill="clear" color="danger" slot="end" (click)="remove(item)" aria-label="Remove {{ item.ingredient_name }}"><ion-icon name="trash-outline"></ion-icon></ion-button>
+      </ion-item>
+    </ion-list>
+    <p *ngIf="!loading && !items.length">No items yet. Add an ingredient or add missing recipe ingredients from Recipes.</p>
+  </main>
+</ion-content>
+
+<ion-alert [isOpen]="confirmMarkAll" header="Mark all remaining items as bought?" [message]="'This checks every remaining item in this ' + (household ? 'shared' : 'personal') + ' shopping list. You can uncheck an item afterwards if needed.'" [buttons]="markAllAlertButtons" (didDismiss)="confirmMarkAll = false"></ion-alert>

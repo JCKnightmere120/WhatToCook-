@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use App\Services\ChildMealPlanner;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class HouseholdProfile extends Model
 {
+    protected $appends = ['age_band'];
     protected $fillable = [
         'family_id',
         'user_id',
@@ -49,5 +51,11 @@ class HouseholdProfile extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /** The API derives this from the stored date; clients never submit an age. */
+    public function getAgeBandAttribute(): ?string
+    {
+        return app(ChildMealPlanner::class)->ageBand($this->birth_date, now());
     }
 }

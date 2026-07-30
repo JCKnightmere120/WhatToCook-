@@ -7,5 +7,5 @@ export class MorePage {
   invitations: FamilyInvitation[] = []; message = '';
   constructor(public auth: AuthService, private api: ApiService, private householdContext: HouseholdContextService) {}
   ionViewWillEnter() { this.api.invitations().subscribe({ next: response => this.invitations = response.invitations }); }
-  accept(invitation: FamilyInvitation) { this.api.acceptInvitation(invitation.id).subscribe({ next: ({ family }) => { this.householdContext.select(this.auth.user?.id, family); this.invitations = this.invitations.filter(item => item.id !== invitation.id); this.message = `You joined ${family.name}. Your household pantry is ready.`; }, error: () => this.message = 'Could not accept this invitation.' }); }
+  accept(invitation: FamilyInvitation) { this.api.acceptInvitation(invitation.id).subscribe({ next: ({ family }) => { this.householdContext.select(this.auth.user?.id, family); this.householdContext.refresh(this.auth.user?.id).subscribe({ error: () => undefined }); this.invitations = this.invitations.filter(item => item.id !== invitation.id); this.message = `You joined ${family.name}. Your household pantry is ready.`; }, error: () => this.message = 'Could not accept this invitation.' }); }
 }

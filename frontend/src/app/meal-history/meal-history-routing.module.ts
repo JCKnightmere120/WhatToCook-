@@ -1,0 +1,1 @@
+import { NgModule } from '@angular/core'; import { RouterModule, Routes } from '@angular/router'; import { MealHistoryPage } from './meal-history.page'; const routes: Routes = [{ path: '', component: MealHistoryPage }]; @NgModule({ imports: [RouterModule.forChild(routes)], exports: [RouterModule] }) export class MealHistoryPageRoutingModule {}

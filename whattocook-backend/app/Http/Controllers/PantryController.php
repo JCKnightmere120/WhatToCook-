@@ -3,29 +3,34 @@
 namespace App\Http\Controllers;
 
 use App\Models\FamilyMember;
+use App\Services\IngredientCatalogService;
 use App\Models\PantryItem;
+use App\Models\IngredientPackageConversion;
+use App\Services\PantryFreshnessService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
-use App\Services\PantryFreshnessService;
 
 class PantryController extends Controller
 {
     private const PURCHASE_SOURCES = ['supermarket', 'sari_sari_store', 'wet_market', 'homegrown', 'leftover', 'unknown'];
+
     private const STORAGE_TYPES = ['room_temperature', 'refrigerated', 'frozen', 'other', 'unknown'];
+
     private const CONDITIONS = ['fresh', 'good', 'uncertain', 'unknown'];
 
     public function index(Request $request)
     {
         $personal = $request->boolean('personal');
         $items = $this->visibleItems($request, $this->requestedFamilyId($request), $personal)->orderBy('freshness_review_date')->get();
+        // GET remains read-only. The scheduled freshness command persists due items;
+        // this presentation fallback keeps an overdue item actionable between runs.
         $items->each(function (PantryItem $item) {
             if (! in_array($item->freshness_status, ['fresh', 'review'], true)) {
                 return;
             }
             $reviewDate = $item->freshness_review_date ?? $item->expiry_date;
             if ($reviewDate !== null && $reviewDate->lessThanOrEqualTo(now()->startOfDay()) && $item->freshness_status !== 'review') {
-                $item->update(['freshness_status' => 'review']);
                 $item->freshness_status = 'review';
             }
         });
@@ -42,8 +47,8 @@ class PantryController extends Controller
         }
 
         $hasPrintedExpiry = ! empty($data['expiry_date']);
-        $estimated = $freshness->estimate($data['name'], $data['unit'] ?? null, $data['storage_type'] ?? null);
         $source = $data['purchase_source'] ?? 'unknown';
+        $estimated = $freshness->estimate($data['name'], $data['unit'] ?? null, $data['storage_type'] ?? null, $source);
 
         $item = PantryItem::create([
             ...$data,
@@ -63,7 +68,7 @@ class PantryController extends Controller
         return response()->json(['item' => $item, 'message' => 'Pantry item added successfully.'], 201);
     }
 
-    public function update(Request $request, $id)
+    public function update(Request $request, $id, PantryFreshnessService $freshness)
     {
         $data = $this->validatedData($request, true);
         $item = $this->visibleItems($request)->findOrFail($id);
@@ -71,12 +76,25 @@ class PantryController extends Controller
 
         $purchaseDate = $data['purchase_date'] ?? $item->purchase_date?->toDateString();
         $expiryDate = array_key_exists('expiry_date', $data) ? $data['expiry_date'] : $item->expiry_date?->toDateString();
-        if ($expiryDate === null) {
-            $expiryDate = now()->addDay()->toDateString();
+        if (array_key_exists('expiry_date', $data) && $data['expiry_date'] !== null) {
+            // Entering a printed date replaces all assumptions made by the estimator.
+            $data['freshness_review_date'] = $data['freshness_review_date'] ?? $data['expiry_date'];
+            $data['freshness_status'] = 'fresh';
+            $data['freshness_confidence'] = 'high';
+            $data['is_expiry_estimated'] = false;
+        } elseif ($expiryDate === null) {
+            $estimate = $freshness->estimate(
+                $data['name'] ?? $item->name,
+                $data['unit'] ?? $item->unit,
+                $data['storage_type'] ?? $item->storage_type,
+                $data['purchase_source'] ?? $item->purchase_source ?? 'unknown',
+            );
+            $expiryDate = $estimate['expiry_date'];
             $data['expiry_date'] = $expiryDate;
             $data['is_expiry_estimated'] = true;
-            $data['freshness_review_date'] = $data['freshness_review_date'] ?? $expiryDate;
-            $data['freshness_status'] = 'review';
+            $data['freshness_review_date'] = $data['freshness_review_date'] ?? $estimate['review_date'];
+            $data['freshness_status'] = $estimate['status'];
+            $data['freshness_confidence'] = $estimate['confidence'];
         }
         if ($purchaseDate !== null && $expiryDate < $purchaseDate) {
             throw ValidationException::withMessages(['expiry_date' => ['The expiry date must be on or after the purchase date.']]);
@@ -96,24 +114,29 @@ class PantryController extends Controller
             'action' => ['required', Rule::in(['still_fresh', 'spoiled', 'used', 'discarded', 'undo_used'])],
             'review_date' => ['nullable', 'date'],
             'used_quantity' => ['nullable', 'numeric', 'gt:0'],
+            'usage_reason' => ['nullable', 'string', 'max:500'],
         ]);
         $item = $this->visibleItems($request)->findOrFail($id);
         if ($data['action'] === 'used') {
             $available = (float) ($item->quantity_value ?? $item->quantity ?? 0);
             $used = (float) ($data['used_quantity'] ?? $available);
-            if ($used > $available) throw ValidationException::withMessages(['used_quantity' => ['You cannot use more than the available quantity.']]);
+            if ($used > $available) {
+                throw ValidationException::withMessages(['used_quantity' => ['You cannot use more than the available quantity.']]);
+            }
             $remaining = round($available - $used, 3);
             $item->update([
-                'quantity_value' => $remaining, 'quantity' => (string) $remaining, 'last_used_quantity' => $used,
+                'quantity_value' => $remaining, 'quantity' => (string) $remaining, 'last_used_quantity' => $used, 'last_usage_reason' => $data['usage_reason'] ?? null,
                 'previous_freshness_status' => $item->freshness_status,
                 'freshness_status' => $remaining <= 0 ? 'used' : ($item->freshness_status === 'review' ? 'review' : 'fresh'),
             ]);
+
             return response()->json(['item' => $item->fresh(), 'message' => $remaining <= 0 ? 'Item marked as used.' : 'Usage recorded and remaining stock updated.']);
         }
         if ($data['action'] === 'undo_used') {
             abort_unless($item->freshness_status === 'used' && $item->last_used_quantity !== null, 422, 'There is no usage action to undo.');
             $restored = (float) ($item->quantity_value ?? 0) + (float) $item->last_used_quantity;
-            $item->update(['quantity_value' => $restored, 'quantity' => (string) $restored, 'freshness_status' => $item->previous_freshness_status ?: 'fresh', 'last_used_quantity' => null, 'previous_freshness_status' => null]);
+            $item->update(['quantity_value' => $restored, 'quantity' => (string) $restored, 'freshness_status' => $item->previous_freshness_status ?: 'fresh', 'last_used_quantity' => null, 'last_usage_reason' => null, 'previous_freshness_status' => null]);
+
             return response()->json(['item' => $item->fresh(), 'message' => 'Last usage was undone.']);
         }
         $updates = match ($data['action']) {
@@ -138,13 +161,34 @@ class PantryController extends Controller
     {
         $item = $this->visibleItems($request)->findOrFail($id);
         $item->delete();
+
         return response()->json(['message' => 'Pantry item deleted successfully.']);
+    }
+
+    /** Save a reusable package weight/count for this pantry scope. */
+    public function confirmPackageConversion(Request $request, $id)
+    {
+        $item = $this->visibleItems($request)->findOrFail($id);
+        $data = $request->validate([
+            'amount_per_package' => 'required|numeric|gt:0|max:1000000',
+            'amount_unit' => 'required|string|max:50',
+        ]);
+        $conversion = IngredientPackageConversion::updateOrCreate([
+            'user_id' => $item->user_id,
+            'family_id' => $item->family_id,
+            'ingredient_name' => strtolower(trim($item->name)),
+            'package_unit' => strtolower(trim((string) $item->unit)),
+            'amount_unit' => strtolower(trim($data['amount_unit'])),
+        ], ['amount_per_package' => $data['amount_per_package']]);
+
+        return response()->json(['conversion' => $conversion, 'message' => 'Package conversion saved and will be used for future recipe matches.']);
     }
 
     private function validatedData(Request $request, bool $partial = false): array
     {
         $required = $partial ? 'sometimes|' : 'required|';
-        return $request->validate([
+
+        $data = $request->validate([
             'name' => $required.'string|max:255',
             'quantity' => $required.'numeric|gt:0|max:999999999.999',
             'unit' => $required.'string|max:50',
@@ -156,7 +200,16 @@ class PantryController extends Controller
             'freshness_condition' => ['sometimes', Rule::in(self::CONDITIONS)],
             'family_id' => 'sometimes|nullable|exists:families,id',
         ]);
+
+        if (array_key_exists('name', $data)) {
+            if (! app(IngredientCatalogService::class)->isCanonicalApproved($data['name'])) {
+                throw ValidationException::withMessages(['name' => ['Choose a recognised canonical ingredient. Confirm a suggestion before saving it.']]);
+            }
+        }
+
+        return $data;
     }
+
 
     private function canUseFamily(Request $request, ?int $familyId): void
     {
@@ -175,10 +228,12 @@ class PantryController extends Controller
 
     private function visibleItems(Request $request, ?int $familyId = null, bool $personal = false)
     {
-        if ($personal) return PantryItem::where('user_id', $request->user()->id)->whereNull('family_id');
+        if ($personal) {
+            return PantryItem::where('user_id', $request->user()->id)->whereNull('family_id');
+        }
         $familyIds = FamilyMember::where('user_id', $request->user()->id)->where('status', 'accepted')->pluck('family_id');
         if ($familyId !== null) {
-            return PantryItem::where(fn ($query) => $query->where('user_id', $request->user()->id)->whereNull('family_id')->orWhere('family_id', $familyId));
+            return PantryItem::where('family_id', $familyId);
         }
 
         return PantryItem::where(fn ($query) => $query->where('user_id', $request->user()->id)->orWhereIn('family_id', $familyIds));

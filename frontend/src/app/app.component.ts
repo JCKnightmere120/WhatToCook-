@@ -1,5 +1,6 @@
 import { Component } from '@angular/core';
 import { ThemeService } from './services/theme.service';
+import { AuthService } from './services/auth.service';
 
 @Component({
   selector: 'app-root',
@@ -8,5 +9,8 @@ import { ThemeService } from './services/theme.service';
   standalone: false,
 })
 export class AppComponent {
-  constructor(theme: ThemeService) { theme.initialise(); }
+  constructor(theme: ThemeService, auth: AuthService) {
+    theme.initialise();
+    auth.restoreHouseholdContext();
+  }
 }
