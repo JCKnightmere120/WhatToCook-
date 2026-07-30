@@ -27,17 +27,42 @@ class AuthController extends Controller
         if ($request->wantsJson()) {
             $token = $user->createToken('auth_token')->plainTextToken;
 
+<<<<<<< HEAD
             return response()->json([
                 'user' => $user,
                 'token' => $token,
                 'message' => 'Registration successful!'
             ], 201);
+=======
+        return response()->json([
+            'user' => $user,
+            'token' => $token,
+            'message' => 'Registration successful!',
+        ], 201);
+    }
+
+    // Login
+    public function login(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email',
+            'password' => 'required',
+        ]);
+
+        $user = User::where('email', $request->email)->first();
+
+        if (! $user || ! Hash::check($request->password, $user->password)) {
+            throw ValidationException::withMessages([
+                'email' => ['Invalid credentials.'],
+            ]);
+>>>>>>> e959e466 (feat: expand household meal planning and pantry workflow)
         }
 
         Auth::login($user);
         return redirect()->route('dashboard');
     }
 
+<<<<<<< HEAD
     public function showRegisterForm()
     {
         return view('auth.register');
@@ -63,11 +88,18 @@ class AuthController extends Controller
 
         throw ValidationException::withMessages([
             'email' => ['These credentials do not match our records.'],
+=======
+        return response()->json([
+            'user' => $user,
+            'token' => $token,
+            'message' => 'Login successful!',
+>>>>>>> e959e466 (feat: expand household meal planning and pantry workflow)
         ]);
     }
 
     public function logout(Request $request)
     {
+<<<<<<< HEAD
         Auth::logout();
 
         $request->session()->invalidate();
@@ -106,6 +138,15 @@ class AuthController extends Controller
         usort($recipes, fn ($a, $b) => $b['match_count'] <=> $a['match_count']);
 
         return view('dashboard', compact('recipes', 'selectedIngredients', 'ingredientList'));
+=======
+        // Revoke all of the account's bearer tokens. This makes logout effective
+        // even when the current request was authenticated through a session.
+        $request->user()->tokens()->delete();
+
+        return response()->json([
+            'message' => 'Logged out successfully!',
+        ]);
+>>>>>>> e959e466 (feat: expand household meal planning and pantry workflow)
     }
 
     public function user(Request $request)

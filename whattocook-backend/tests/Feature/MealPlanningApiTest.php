@@ -1,0 +1,99 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\FamilyMember;
+use App\Models\HouseholdProfile;
+use App\Models\PantryItem;
+use App\Models\Recipe;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class MealPlanningApiTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_a_family_meal_keeps_diners_and_servings_and_is_visible_to_members(): void
+    {
+        [$owner, $member, $family] = $this->family();
+        $diner = HouseholdProfile::create(['family_id' => $family['id'], 'name' => 'Mika']);
+        $recipe = $this->recipe($owner, 'Tinola');
+
+        $plan = $this->actingAs($owner, 'sanctum')->postJson('/api/meal-plans', [
+            'recipe_id' => $recipe->id, 'family_id' => $family['id'], 'planned_date' => '2026-08-03', 'meal_type' => 'dinner',
+            'servings' => 3, 'diner_profile_ids' => [$diner->id],
+        ])->assertCreated()->assertJsonPath('servings', 3)->assertJsonPath('diner_profile_ids.0', $diner->id)->json();
+
+        $this->actingAs($member, 'sanctum')->getJson("/api/meal-plans?family_id={$family['id']}&start_date=2026-08-03&end_date=2026-08-03")
+            ->assertOk()->assertJsonCount(1)->assertJsonPath('0.id', $plan['id']);
+    }
+
+    public function test_two_week_generation_filters_unsafe_recipes_and_replaces_open_slots(): void
+    {
+        [$owner, , $family] = $this->family();
+        $diner = HouseholdProfile::create(['family_id' => $family['id'], 'name' => 'Ana', 'allergies' => ['peanut']]);
+        $safe = $this->recipe($owner, 'Safe Recipe', 'Chicken');
+        $this->recipe($owner, 'Unsafe Recipe', 'Peanut');
+
+        $this->actingAs($owner, 'sanctum')->postJson('/api/meal-plans/generate', [
+            'family_id' => $family['id'], 'start_date' => '2026-08-03', 'weeks' => 2,
+            'diner_profile_ids' => [$diner->id], 'meal_types' => ['dinner'],
+        ])->assertCreated()->assertJsonCount(14, 'meal_plans')->assertJsonPath('meal_plans.0.recipe_id', $safe->id);
+
+        $this->actingAs($owner, 'sanctum')->postJson('/api/meal-plans/generate', [
+            'family_id' => $family['id'], 'start_date' => '2026-08-03', 'weeks' => 1,
+            'diner_profile_ids' => [$diner->id], 'replace_existing' => true,
+        ])->assertCreated()->assertJsonCount(7, 'meal_plans');
+        // The replacement period is one week; the second week from the original plan remains intact.
+        $this->assertDatabaseCount('meal_plans', 14);
+    }
+
+    public function test_cooking_scales_pantry_deduction_to_planned_servings(): void
+    {
+        $user = User::factory()->create();
+        $recipe = $this->recipe($user, 'Rice Meal', 'Rice', '1', 'kg', 2);
+        $item = PantryItem::create(['user_id' => $user->id, 'name' => 'Rice', 'quantity' => '3', 'quantity_value' => 3, 'unit' => 'kg', 'freshness_status' => 'fresh']);
+        $plan = $this->actingAs($user, 'sanctum')->postJson('/api/meal-plans', [
+            'recipe_id' => $recipe->id, 'planned_date' => '2026-08-03', 'meal_type' => 'dinner', 'servings' => 4,
+        ])->assertCreated()->json();
+
+        $this->actingAs($user, 'sanctum')->postJson("/api/meal-plans/{$plan['id']}/complete")
+            ->assertOk()->assertJsonPath('meal_plan.consumed_items.0.quantity', 2);
+        $this->assertDatabaseHas('pantry_items', ['id' => $item->id, 'quantity_value' => 1]);
+    }
+
+    public function test_a_solo_plan_uses_the_users_profile_and_rejects_an_unsafe_recipe(): void
+    {
+        $user = User::factory()->create();
+        $user->profile()->create(['allergies' => ['shrimp']]);
+        $unsafe = $this->recipe($user, 'Shrimp Sinigang', 'Shrimp');
+        $safe = $this->recipe($user, 'Munggo', 'Mung beans');
+
+        $this->actingAs($user, 'sanctum')->postJson('/api/meal-plans', [
+            'recipe_id' => $unsafe->id, 'planned_date' => '2026-08-03', 'meal_type' => 'dinner', 'servings' => 1,
+        ])->assertUnprocessable()->assertJsonPath('errors.recipe_id.0', 'This recipe conflicts with the active diner profile or dietary restrictions.');
+
+        $this->actingAs($user, 'sanctum')->postJson('/api/meal-plans', [
+            'recipe_id' => $safe->id, 'planned_date' => '2026-08-03', 'meal_type' => 'dinner', 'servings' => 1,
+        ])->assertCreated()->assertJsonPath('family_id', null);
+    }
+
+    private function family(): array
+    {
+        $owner = User::factory()->create();
+        $member = User::factory()->create();
+        $family = $this->actingAs($owner, 'sanctum')->postJson('/api/families', ['name' => 'Santos'])->json();
+        FamilyMember::create(['family_id' => $family['id'], 'user_id' => $member->id, 'role' => 'member', 'status' => 'accepted']);
+
+        return [$owner, $member, $family];
+    }
+
+    private function recipe(User $user, string $name, string $ingredient = 'Rice', string $quantity = '1', string $unit = 'cup', int $servings = 2): Recipe
+    {
+        $recipe = Recipe::create(['name' => $name, 'instructions' => 'Cook.', 'servings' => $servings, 'created_by' => $user->id]);
+        $recipe->ingredients()->create(['name' => $ingredient, 'quantity' => $quantity, 'unit' => $unit]);
+
+        return $recipe;
+    }
+}

@@ -1,0 +1,122 @@
+.page {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 16px;
+  color: #263a31;
+}
+
+.intro,
+.message,
+.notice {
+  line-height: 1.45;
+}
+
+.message {
+  background: #fff2d9;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.notice { color: #9b5a1c; }
+.spinner { display: block; margin: 36px auto; }
+.planner-heading { margin-bottom: 14px; }
+.planner-heading .intro { margin-top: 0; }
+
+.context-picker {
+  margin: 0;
+  border: 1px solid #dce6de;
+  border-radius: 10px;
+  --background: #fff;
+}
+
+.planner-controls { display: flex; justify-content: flex-end; }
+.planner-controls ion-item { --background: transparent; max-width: 150px; }
+
+.week-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 12px 0 18px;
+}
+
+.week-nav button {
+  border: 0;
+  background: transparent;
+  color: #263a31;
+  font-weight: 700;
+}
+
+.week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(145px, 1fr));
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 10px;
+}
+
+.day {
+  min-width: 145px;
+  background: #f7faf7;
+  border: 1px solid #e2ebe3;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.day header {
+  display: flex;
+  justify-content: space-between;
+  padding: 11px;
+  background: #eaf3eb;
+}
+
+.day header span {
+  color: #5a7160;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.slot { padding: 10px; border-top: 1px solid #e2ebe3; }
+
+.meal-type {
+  display: block;
+  margin-bottom: 5px;
+  color: #718076;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.planned,
+.add {
+  width: 100%;
+  border: 0;
+  border-radius: 9px;
+  padding: 8px;
+  color: #263a31;
+  text-align: left;
+}
+
+.planned { background: #e7f3e7; }
+.planned strong,
+.planned small { display: block; }
+.planned small { margin-top: 3px; color: #607067; font-size: 11px; }
+
+.add {
+  border: 1px dashed #aab8ad;
+  background: #fff;
+  color: #59705f;
+  font-size: 12px;
+}
+
+.slot ion-button { margin: 4px 0 0; --padding-start: 0; font-size: 12px; }
+.cooked { color: #347049; font-weight: 600; }
+.editor h2 { margin: 24px 0 8px; font-size: 18px; }
+.helper { color: #718076; font-size: 13px; line-height: 1.4; }
+
+.planner-footer ion-toolbar { --padding-top: 8px; --padding-bottom: 8px; --padding-start: 12px; --padding-end: 12px; }
+.planner-footer ion-button { margin: 0; }
+
+@media (max-width: 640px) {
+  .page { padding: 12px; }
+  .week { grid-template-columns: repeat(7, minmax(136px, 1fr)); }
+}

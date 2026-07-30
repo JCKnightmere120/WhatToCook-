@@ -1,0 +1,104 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start"><ion-back-button defaultHref="/tabs/meal-plan"></ion-back-button></ion-buttons>
+    <ion-title>Meal details</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="load()" [disabled]="loading || actionPending" aria-label="Refresh meal details"><ion-icon name="refresh-outline"></ion-icon></ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <main class="page">
+    <ion-spinner *ngIf="loading" class="loading" aria-label="Loading planned meal"></ion-spinner>
+    <ion-text color="danger" *ngIf="message"><p class="message">{{ message }}</p></ion-text>
+
+    <ng-container *ngIf="!loading && plan">
+      <ion-card>
+        <ion-card-header>
+          <ion-card-subtitle>{{ dateLabel(plan.planned_date) }} · {{ mealTypeLabel(plan.meal_type) }}</ion-card-subtitle>
+          <ion-card-title>{{ plan.recipe?.name || 'Planned meal' }}</ion-card-title>
+        </ion-card-header>
+        <ion-card-content>
+          <p>{{ plan.servings || 1 }} serving{{ plan.servings === 1 ? '' : 's' }} · {{ dinerNames }}</p>
+          <p *ngIf="plan.recipe?.description">{{ plan.recipe?.description }}</p>
+          <ion-note color="success" *ngIf="isCompleted">Cooked{{ plan.completion_method === 'without_pantry_deduction' ? ' without changing pantry stock' : ' and deducted from pantry' }}.</ion-note>
+        </ion-card-content>
+      </ion-card>
+
+      <section *ngIf="!isCompleted" aria-labelledby="ingredients-heading">
+        <div class="section-heading">
+          <div><h2 id="ingredients-heading">Ingredient check</h2><p>This is checked against your {{ preflight?.pantry_scope === 'family' ? 'shared household' : 'personal' }} pantry.</p></div>
+          <ion-button size="small" fill="clear" (click)="checkIngredients()" [disabled]="checking || actionPending">{{ checking ? 'Checking…' : 'Recheck' }}</ion-button>
+        </div>
+        <ion-list inset="true" *ngIf="preflight">
+          <ion-item *ngFor="let check of ingredientChecks">
+            <ion-label>
+              <h2>{{ check.name }}</h2>
+              <p>{{ ingredientDetail(check) }}</p>
+              <p *ngIf="check.substitutes?.length">Possible substitutes: {{ check.substitutes?.join(', ') }}</p>
+            </ion-label>
+            <ion-note slot="end" [color]="ingredientStatus(check)">{{ ingredientLabel(check) }}</ion-note>
+          </ion-item>
+        </ion-list>
+        <ion-note color="medium" *ngIf="!preflight && !checking">Ingredient status is unavailable right now. Refresh to check before cooking.</ion-note>
+      </section>
+
+      <section *ngIf="!isCompleted" class="actions" aria-label="Meal actions">
+        <ion-button expand="block" fill="outline" (click)="openSwap()" [disabled]="actionPending">Swap this meal</ion-button>
+        <ion-button expand="block" fill="outline" (click)="showExtra = true" [disabled]="actionPending">Add an extra to shopping list</ion-button>
+        <ion-button expand="block" (click)="requestCook()" [disabled]="!preflight?.can_cook_from_pantry || actionPending">
+          {{ actionPending ? 'Updating…' : 'Cook & deduct pantry' }}
+        </ion-button>
+        <ion-note color="medium" class="action-help" *ngIf="preflight && !preflight.can_cook_from_pantry">Cooking is disabled until missing quantities are resolved. You can shop, update the pantry, or explicitly record that this meal was cooked without a pantry change.</ion-note>
+        <ion-button expand="block" fill="outline" (click)="addShortagesToList()" [disabled]="(!preflight?.ingredients_by_status?.low_stock?.length && !preflight?.ingredients_by_status?.missing?.length) || addingToList || actionPending">
+          {{ addingToList ? 'Adding to shopping list…' : 'Add shortages to shopping list' }}
+        </ion-button>
+        <ion-button expand="block" fill="outline" (click)="openPantry()" [disabled]="actionPending">I bought ingredients — update pantry</ion-button>
+        <ion-button expand="block" fill="clear" (click)="requestMarkCookedWithoutDeduction()" [disabled]="actionPending">Mark cooked without pantry update</ion-button>
+        <ion-button expand="block" fill="clear" color="medium" (click)="editInPlanner()" [disabled]="actionPending">Edit, swap, or reschedule in planner</ion-button>
+      </section>
+    </ng-container>
+  </main>
+</ion-content>
+
+<ion-alert
+  [isOpen]="confirmingCook"
+  header="Cook this meal?"
+  message="The checked pantry quantities will be deducted and the meal will be added to your cooking history."
+  [buttons]="cookAlertButtons"
+  (didDismiss)="confirmingCook = false">
+</ion-alert>
+
+<ion-modal [isOpen]="showSwap" (didDismiss)="showSwap = false">
+  <ng-template>
+    <ion-header><ion-toolbar><ion-title>Swap meal</ion-title><ion-buttons slot="end"><ion-button (click)="showSwap = false">Cancel</ion-button></ion-buttons></ion-toolbar></ion-header>
+    <ion-content class="ion-padding">
+      <p>Choose a profile-safe alternative. The date, meal type, diners, and servings stay the same.</p>
+      <ion-item><ion-select label="New meal" labelPlacement="stacked" [(ngModel)]="selectedSwapRecipeId"><ion-select-option *ngFor="let item of swapRecipes" [value]="item.recipe.id">{{ item.recipe.name }}</ion-select-option></ion-select></ion-item>
+      <ion-note color="medium" *ngIf="!swapRecipes.length">No alternative safe recipes are available right now.</ion-note>
+      <ion-button expand="block" (click)="swapMeal()" [disabled]="!selectedSwapRecipeId || swapping">{{ swapping ? 'Swapping…' : 'Save swap' }}</ion-button>
+    </ion-content>
+  </ng-template>
+</ion-modal>
+
+<ion-modal [isOpen]="showExtra" (didDismiss)="showExtra = false">
+  <ng-template>
+    <ion-header><ion-toolbar><ion-title>Add meal extra</ion-title><ion-buttons slot="end"><ion-button (click)="showExtra = false">Cancel</ion-button></ion-buttons></ion-toolbar></ion-header>
+    <ion-content class="ion-padding">
+      <p>Add a side, topping, or extra ingredient to this meal's {{ plan?.family_id ? 'shared household' : 'personal' }} shopping list. This does not change the shared recipe.</p>
+      <ion-item><ion-input label="Ingredient or side" labelPlacement="stacked" [(ngModel)]="extraName"></ion-input></ion-item>
+      <ion-item><ion-input label="Quantity" labelPlacement="stacked" type="number" min="0.001" [(ngModel)]="extraQuantity"></ion-input></ion-item>
+      <ion-item><ion-input label="Unit" labelPlacement="stacked" placeholder="e.g. g, pack, pieces" [(ngModel)]="extraUnit"></ion-input></ion-item>
+      <ion-button expand="block" (click)="addExtraToList()" [disabled]="addingExtra || !extraName.trim() || !extraQuantity || !extraUnit.trim()">{{ addingExtra ? 'Adding…' : 'Add to shopping list' }}</ion-button>
+    </ion-content>
+  </ng-template>
+</ion-modal>
+
+<ion-alert
+  [isOpen]="confirmingWithoutDeduction"
+  header="Mark as cooked without pantry update?"
+  message="Use this only when the ingredients were bought or supplied outside the tracked pantry. The meal will still appear in cooking history."
+  [buttons]="withoutDeductionAlertButtons"
+  (didDismiss)="confirmingWithoutDeduction = false">
+</ion-alert>
