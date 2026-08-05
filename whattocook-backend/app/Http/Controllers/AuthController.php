@@ -27,21 +27,18 @@ class AuthController extends Controller
         if ($request->wantsJson()) {
             $token = $user->createToken('auth_token')->plainTextToken;
 
-<<<<<<< HEAD
             return response()->json([
                 'user' => $user,
                 'token' => $token,
-                'message' => 'Registration successful!'
+                'message' => 'Registration successful!',
             ], 201);
-=======
-        return response()->json([
-            'user' => $user,
-            'token' => $token,
-            'message' => 'Registration successful!',
-        ], 201);
+        }
+
+        Auth::login($user);
+        return redirect()->route('dashboard');
     }
 
-    // Login
+    // API login method
     public function login(Request $request)
     {
         $request->validate([
@@ -55,98 +52,77 @@ class AuthController extends Controller
             throw ValidationException::withMessages([
                 'email' => ['Invalid credentials.'],
             ]);
->>>>>>> e959e466 (feat: expand household meal planning and pantry workflow)
+        }
+
+        if ($request->wantsJson()) {
+            $token = $user->createToken('auth_token')->plainTextToken;
+
+            return response()->json([
+                'user' => $user,
+                'token' => $token,
+                'message' => 'Login successful!',
+            ]);
         }
 
         Auth::login($user);
         return redirect()->route('dashboard');
     }
 
-<<<<<<< HEAD
-    public function showRegisterForm()
-    {
-        return view('auth.register');
-    }
-
+    // Web login form
     public function showLoginForm()
     {
         return view('auth.login');
     }
 
+    // Web register form
+    public function showRegisterForm()
+    {
+        return view('auth.register');
+    }
+
+    // Web authentication endpoint
     public function authenticate(Request $request)
     {
         $credentials = $request->validate([
-            'email' => ['required', 'email'],
-            'password' => ['required'],
+            'email' => 'required|email',
+            'password' => 'required',
         ]);
 
-        if (Auth::attempt($credentials, $request->boolean('remember'))) {
-            $request->session()->regenerate();
-
-            return redirect()->intended('/dashboard');
+        if (! Auth::attempt($credentials, $request->boolean('remember'))) {
+            return back()->withErrors([
+                'email' => 'Invalid credentials.',
+            ])->withInput($request->except('password'));
         }
 
-        throw ValidationException::withMessages([
-            'email' => ['These credentials do not match our records.'],
-=======
-        return response()->json([
-            'user' => $user,
-            'token' => $token,
-            'message' => 'Login successful!',
->>>>>>> e959e466 (feat: expand household meal planning and pantry workflow)
-        ]);
-    }
+        $request->session()->regenerate();
 
-    public function logout(Request $request)
-    {
-<<<<<<< HEAD
-        Auth::logout();
-
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
-
-        return redirect('/login');
+        return redirect()->route('dashboard');
     }
 
     public function dashboard(Request $request)
     {
-        $selectedIngredients = trim((string) $request->input('ingredients', ''));
-        $ingredientList = array_values(array_filter(array_map('trim', preg_split('/[\n,]+/', $selectedIngredients) ?: [])));
+        return view('dashboard');
+    }
 
-        $recipes = [
-            [
-                'title' => 'Quick Pasta Bowl',
-                'description' => 'A fast dinner using tomatoes, basil, and pasta.',
-                'ingredients' => ['pasta', 'tomato', 'basil', 'olive oil'],
-            ],
-            [
-                'title' => 'Veggie Stir Fry',
-                'description' => 'A colorful meal with broccoli, carrots, and soy sauce.',
-                'ingredients' => ['broccoli', 'carrot', 'soy sauce', 'garlic'],
-            ],
-            [
-                'title' => 'Chicken Wraps',
-                'description' => 'Simple wraps made with chicken, lettuce, and yogurt sauce.',
-                'ingredients' => ['chicken', 'lettuce', 'yogurt', 'tortilla'],
-            ],
-        ];
-
-        foreach ($recipes as &$recipe) {
-            $recipe['match_count'] = count(array_intersect($ingredientList, $recipe['ingredients']));
-        }
-
-        usort($recipes, fn ($a, $b) => $b['match_count'] <=> $a['match_count']);
-
-        return view('dashboard', compact('recipes', 'selectedIngredients', 'ingredientList'));
-=======
+    public function logout(Request $request)
+    {
         // Revoke all of the account's bearer tokens. This makes logout effective
         // even when the current request was authenticated through a session.
-        $request->user()->tokens()->delete();
+        if ($request->user()) {
+            $request->user()->tokens()->delete();
+        }
 
-        return response()->json([
-            'message' => 'Logged out successfully!',
-        ]);
->>>>>>> e959e466 (feat: expand household meal planning and pantry workflow)
+        Auth::logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'message' => 'Logged out successfully!',
+            ]);
+        }
+
+        return redirect()->route('login');
     }
 
     public function user(Request $request)
@@ -154,3 +130,4 @@ class AuthController extends Controller
         return response()->json($request->user());
     }
 }
+
