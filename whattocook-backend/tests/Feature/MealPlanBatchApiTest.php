@@ -50,6 +50,29 @@ class MealPlanBatchApiTest extends TestCase
         $this->assertDatabaseMissing('meal_plans', ['meal_plan_batch_id' => $batch['id']]);
     }
 
+    public function test_a_family_draft_warns_and_cannot_save_when_a_selected_linked_diner_has_a_personal_meal_in_the_same_slot(): void
+    {
+        $owner = User::factory()->create();
+        $member = User::factory()->create();
+        $family = $this->actingAs($owner, 'sanctum')->postJson('/api/families', ['name' => 'Santos Family'])->json();
+        \App\Models\FamilyMember::create(['family_id' => $family['id'], 'user_id' => $member->id, 'role' => 'member', 'status' => 'accepted']);
+        $diner = HouseholdProfile::create(['family_id' => $family['id'], 'user_id' => $member->id, 'name' => $member->name]);
+        $recipe = $this->recipe($owner, 'Chicken Tinola', 'Chicken', '1', 'kg');
+        MealPlan::create(['user_id' => $member->id, 'recipe_id' => $recipe->id, 'planned_date' => '2026-08-03', 'meal_type' => 'dinner', 'servings' => 1, 'status' => 'scheduled']);
+
+        $batch = $this->actingAs($owner, 'sanctum')->postJson('/api/meal-plan-batches/generate', [
+            'family_id' => $family['id'], 'start_date' => '2026-08-03', 'end_date' => '2026-08-03',
+            'meal_types' => ['dinner'], 'diner_profile_ids' => [$diner->id],
+        ])->assertCreated()
+            ->assertJsonPath('personal_conflicts.0.diner_profile_id', $diner->id)
+            ->assertJsonPath('personal_conflicts.0.planned_date', '2026-08-03')
+            ->json('batch');
+
+        $this->actingAs($owner, 'sanctum')->postJson("/api/meal-plan-batches/{$batch['id']}/save")
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('personal_conflicts');
+    }
+
     public function test_draft_ingredient_summary_aggregates_fractional_and_convertible_units(): void
     {
         $user = User::factory()->create();

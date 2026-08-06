@@ -16,6 +16,8 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(10)->create();
 
+        // RecipeSeeder is the reviewed Filipino recipe manifest. The catalogue
+        // is then synchronized from that manifest plus its explicit pantry base.
         $this->call([RecipeSeeder::class, IngredientCatalogSeeder::class]);
     }
 }

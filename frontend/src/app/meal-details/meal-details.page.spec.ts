@@ -47,6 +47,14 @@ describe('MealDetailsPage', () => {
     });
   });
 
+  it('launches cooking mode for an unfinished meal', () => {
+    component.plan = familyPlan;
+
+    component.startCooking();
+
+    expect(router.navigate).toHaveBeenCalledWith(['/cooking', 42]);
+  });
+
   it('shows all preflight ingredient states and blocks a cook action until stock is ready', () => {
     const preflight: MealPlanPreflight = {
       meal_plan: familyPlan,

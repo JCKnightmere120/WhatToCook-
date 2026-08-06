@@ -8,10 +8,11 @@ export interface PantryItem { id: number; name: string; quantity?: string; quant
 export interface PackageItem { id: number; name: string; quantity?: number | string; unit?: string; }
 export interface Family { id: number; name: string; owner_id: number; join_code?: string; owner?: { id: number; name: string }; members?: Array<{ id: number; user_id: number; role: string; user?: { id: number; name: string; email: string } }>; }
 export interface RecipeIngredient { name: string; quantity?: string; unit?: string; substitutes: string[]; needs_review?: boolean; pantry_units?: string[]; package_items?: PackageItem[]; }
-export interface Recommendation { recipe: { id: number; name: string; servings?: number; prep_time?: number; cook_time?: number; }; match_percentage: number; available_ingredients: RecipeIngredient[]; needs_review_ingredients?: RecipeIngredient[]; missing_ingredients: RecipeIngredient[]; }
+export interface RecipeSummary { id: number; name: string; description?: string; servings?: number; prep_time?: number; cook_time?: number; meal_type?: string; difficulty?: string; region?: string; image?: string | null; image_source_url?: string | null; image_attribution?: string | null; }
+export interface Recommendation { recipe: RecipeSummary; match_percentage: number; available_ingredients: RecipeIngredient[]; needs_review_ingredients?: RecipeIngredient[]; missing_ingredients: RecipeIngredient[]; }
 export interface RecipeSearchResponse { data: Recommendation[]; current_page: number; last_page: number; total: number; }
-export interface RecipeDetail { id: number; name: string; description?: string; instructions?: string; cooking_tips?: string; servings?: number; prep_time?: number; cook_time?: number; ingredients: RecipeIngredient[]; }
-export interface RecipeNutrition { servings: number; totals: Record<string, number>; per_serving: Record<string, number>; unmatched_ingredients: Array<{ ingredient_id: number; name: string; reason: string }>; is_complete: boolean; }
+export interface RecipeDetail extends RecipeSummary { instructions?: string; cooking_tips?: string; ingredients: RecipeIngredient[]; }
+export interface RecipeNutrition { servings: number; totals: Record<string, number>; per_serving: Record<string, number>; unmatched_ingredients: Array<{ ingredient_id: number; name: string; reason: string }>; is_complete: boolean; is_nutrition_complete?: boolean; data_status?: 'complete' | 'partial' | 'incomplete'; unknown_nutrients?: Record<string, string[]>; disclaimer?: string; }
 export interface Profile { health_conditions: string[]; allergies: string[]; dietary_restrictions: string[]; likes: string[]; dislikes: string[]; visible_to_family: Record<string, boolean>; }
 export interface HouseholdProfile { id: number; family_id: number; user_id?: number | null; name: string; relation?: string | null; sex?: string | null; birth_date?: string | null; age_band?: '0-5_months' | '6-11_months' | '12-23_months' | '2-5_years' | '6_plus_years' | null; height_cm?: number | string | null; weight_kg?: number | string | null; activity_level?: string | null; goal?: string | null; health_conditions?: string[]; allergies?: string[]; dietary_restrictions?: string[]; likes?: string[]; dislikes?: string[]; visible_to_family?: Record<string, boolean>; }
 export interface FamilyInvitation { id: number; family_id: number; status: 'pending'; family: Family; }
@@ -27,13 +28,15 @@ export interface MealPlanBatchGenerationPayload { family_id?: number | null; sta
 export interface MealPlanBatchMealPayload { recipe_id?: number; planned_date?: string; meal_type?: 'breakfast' | 'lunch' | 'dinner'; servings?: number; diner_profile_ids?: number[]; }
 export interface MealPlanIngredientStatus { name: string; unit?: string | null; required_quantity?: number | null; pantry_quantity?: number | null; missing_quantity?: number | null; status: 'ready' | 'low_stock' | 'missing' | 'needs_review'; substitutes?: string[]; }
 export interface MealPlanBatchSummary { meal_count: number; ready_count: number; ingredients: MealPlanIngredientStatus[]; shortages: MealPlanIngredientStatus[]; needs_review: MealPlanIngredientStatus[]; }
-export interface MealPlanBatchResponse { batch: MealPlanBatch; meal_plans: MealPlan[]; summary: MealPlanBatchSummary; conflicts: MealPlan[]; message?: string; }
+export interface PersonalMealConflict { diner_profile_id: number; diner_name: string; planned_date: string; meal_type: 'breakfast' | 'lunch' | 'dinner'; }
+export interface MealPlanBatchResponse { batch: MealPlanBatch; meal_plans: MealPlan[]; summary: MealPlanBatchSummary; conflicts: MealPlan[]; personal_conflicts?: PersonalMealConflict[]; message?: string; }
 export interface PurchasedPlanIngredient { name: string; quantity: number; unit: string; purchase_date?: string; expiry_date?: string; storage_type?: 'room_temperature' | 'refrigerated' | 'frozen' | 'other' | 'unknown'; }
 export interface MealPlanIngredientCheck { name: string; quantity?: string | null; required_quantity?: number | null; unit?: string | null; available: boolean; sufficient: boolean; pantry_quantity?: number | null; missing_quantity?: number | null; substitutes?: string[]; status: 'ready' | 'low_stock' | 'missing' | 'needs_review'; }
 export interface MealPlanPreflight { meal_plan: MealPlan; recipe: RecipeDetail; diners: Array<Pick<HouseholdProfile, 'id' | 'name' | 'relation'>>; pantry_scope: 'personal' | 'family'; can_cook_from_pantry: boolean; can_mark_cooked_without_deduction: boolean; match_percentage: number; ingredients: MealPlanIngredientCheck[]; ingredients_by_status: Record<'ready' | 'low_stock' | 'missing' | 'needs_review', MealPlanIngredientCheck[]>; }
 export interface ShoppingListItem { id: number; family_id?: number | null; ingredient_name: string; quantity?: string | null; unit?: string | null; is_purchased: boolean; }
+export interface ConfirmedPurchase { confirmed: true; name?: string; quantity: string | number; unit: string; purchase_date?: string; expiry_date?: string | null; purchase_source?: string; storage_type?: string; }
 export interface MealHistoryItem { id: number; family_id?: number | null; recipe_id: number; prepared_at: string; servings?: number | null; notes?: string | null; recipe?: RecipeDetail; }
-export interface RecipeReview { id: number; rating: number; comment?: string | null; user?: { id: number; name: string }; }
+export interface RecipeReview { id: number; rating: number; review?: string | null; user?: { id: number; name: string }; }
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -72,9 +75,13 @@ export class ApiService {
   updateHouseholdProfile(familyId: number, profileId: number, profile: Partial<HouseholdProfile>): Observable<{ household_profile: HouseholdProfile }> { return this.http.put<{ household_profile: HouseholdProfile }>(`${this.baseUrl}/families/${familyId}/household-profiles/${profileId}`, profile, this.options()); }
   deleteHouseholdProfile(familyId: number, profileId: number): Observable<unknown> { return this.http.delete(`${this.baseUrl}/families/${familyId}/household-profiles/${profileId}`, this.options()); }
   recommendations(familyId?: number): Observable<{ recommendations: Recommendation[] }> { return this.http.get<{ recommendations: Recommendation[] }>(`${this.baseUrl}/recipes/recommendations`, { ...this.options(), params: familyId ? { family_id: familyId } : undefined }); }
-  searchRecipes(query: string, familyId?: number): Observable<RecipeSearchResponse> {
-    const params: Record<string, string> = { q: query, include_match: '1' };
+  searchRecipes(query = '', familyId?: number, filters: { mealType?: string; difficulty?: string; maxTime?: number; page?: number } = {}): Observable<RecipeSearchResponse> {
+    const params: Record<string, string> = { q: query, include_match: '1', per_page: '12' };
     if (familyId) params['family_id'] = String(familyId);
+    if (filters.mealType) params['meal_type'] = filters.mealType;
+    if (filters.difficulty) params['difficulty'] = filters.difficulty;
+    if (filters.maxTime) params['max_time'] = String(filters.maxTime);
+    if (filters.page) params['page'] = String(filters.page);
     return this.http.get<RecipeSearchResponse>(`${this.baseUrl}/recipes`, { ...this.options(), params });
   }
   recipe(recipeId: number): Observable<RecipeDetail> { return this.http.get<RecipeDetail>(`${this.baseUrl}/recipes/${recipeId}`, this.options()); }
@@ -87,8 +94,8 @@ export class ApiService {
   mealPlan(planId: number): Observable<MealPlan> { return this.http.get<MealPlan>(`${this.baseUrl}/meal-plans/${planId}`, this.options()); }
   mealPlanPreflight(planId: number): Observable<MealPlanPreflight> { return this.http.get<MealPlanPreflight>(`${this.baseUrl}/meal-plans/${planId}/preflight`, this.options()); }
   addMealPlanShortagesToShoppingList(planId: number): Observable<{ items: ShoppingListItem[]; message: string }> { return this.http.post<{ items: ShoppingListItem[]; message: string }>(`${this.baseUrl}/meal-plans/${planId}/shopping-list`, {}, this.options()); }
-  cookMealPlan(planId: number): Observable<{ meal_plan: MealPlan; message: string }> { return this.http.post<{ meal_plan: MealPlan; message: string }>(`${this.baseUrl}/meal-plans/${planId}/complete`, {}, this.options()); }
-  completeMealPlanWithoutDeduction(planId: number): Observable<{ meal_plan: MealPlan; message: string }> { return this.http.post<{ meal_plan: MealPlan; message: string }>(`${this.baseUrl}/meal-plans/${planId}/complete-without-deduction`, {}, this.options()); }
+  cookMealPlan(planId: number, notes?: string): Observable<{ meal_plan: MealPlan; message: string }> { return this.http.post<{ meal_plan: MealPlan; message: string }>(`${this.baseUrl}/meal-plans/${planId}/complete`, { notes: notes?.trim() || null }, this.options()); }
+  completeMealPlanWithoutDeduction(planId: number, notes?: string): Observable<{ meal_plan: MealPlan; message: string }> { return this.http.post<{ meal_plan: MealPlan; message: string }>(`${this.baseUrl}/meal-plans/${planId}/complete-without-deduction`, { notes: notes?.trim() || null }, this.options()); }
   generateMealPlans(payload: MealPlanGenerationPayload): Observable<{ meal_plans: MealPlan[]; start_date: string; end_date: string }> { return this.http.post<{ meal_plans: MealPlan[]; start_date: string; end_date: string }>(`${this.baseUrl}/meal-plans/generate`, payload, this.options()); }
   generateMealPlanBatch(payload: MealPlanBatchGenerationPayload): Observable<MealPlanBatchResponse> { return this.http.post<MealPlanBatchResponse>(`${this.baseUrl}/meal-plan-batches/generate`, payload, this.options()); }
   mealPlanBatch(batchId: number): Observable<MealPlanBatchResponse> { return this.http.get<MealPlanBatchResponse>(`${this.baseUrl}/meal-plan-batches/${batchId}`, this.options()); }
@@ -100,10 +107,12 @@ export class ApiService {
   shoppingList(): Observable<ShoppingListItem[]> { return this.http.get<ShoppingListItem[]>(`${this.baseUrl}/shopping-list`, this.options()); }
   addShoppingItem(item: Omit<ShoppingListItem, 'id'>): Observable<ShoppingListItem> { return this.http.post<ShoppingListItem>(`${this.baseUrl}/shopping-list`, item, this.options()); }
   updateShoppingItem(id: number, item: Partial<ShoppingListItem>): Observable<ShoppingListItem> { return this.http.put<ShoppingListItem>(`${this.baseUrl}/shopping-list/${id}`, item, this.options()); }
+  confirmShoppingPurchase(id: number, purchase: ConfirmedPurchase): Observable<{ shopping_item: ShoppingListItem; pantry_item: PantryItem; message: string }> { return this.http.post<{ shopping_item: ShoppingListItem; pantry_item: PantryItem; message: string }>(`${this.baseUrl}/shopping-list/${id}/confirm-purchase`, purchase, this.options()); }
   deleteShoppingItem(id: number): Observable<unknown> { return this.http.delete(`${this.baseUrl}/shopping-list/${id}`, this.options()); }
   mealHistory(): Observable<MealHistoryItem[]> { return this.http.get<MealHistoryItem[]>(`${this.baseUrl}/meal-history`, this.options()); }
   favoriteRecipe(recipeId: number): Observable<unknown> { return this.http.post(`${this.baseUrl}/recipes/${recipeId}/favorite`, {}, this.options()); }
   unfavoriteRecipe(recipeId: number): Observable<unknown> { return this.http.delete(`${this.baseUrl}/recipes/${recipeId}/favorite`, this.options()); }
+  favorites(): Observable<RecipeDetail[]> { return this.http.get<RecipeDetail[]>(`${this.baseUrl}/favorites`, this.options()); }
   recipeReviews(recipeId: number): Observable<RecipeReview[] | { reviews: RecipeReview[] }> { return this.http.get<RecipeReview[] | { reviews: RecipeReview[] }>(`${this.baseUrl}/recipes/${recipeId}/reviews`, this.options()); }
-  reviewRecipe(recipeId: number, rating: number, comment: string): Observable<unknown> { return this.http.put(`${this.baseUrl}/recipes/${recipeId}/review`, { rating, comment }, this.options()); }
+  reviewRecipe(recipeId: number, rating: number, review: string): Observable<unknown> { return this.http.put(`${this.baseUrl}/recipes/${recipeId}/review`, { rating, review }, this.options()); }
 }

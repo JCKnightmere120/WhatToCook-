@@ -213,6 +213,10 @@ class MealPlanBatchController extends Controller
         $summary = $this->summary($request, $mealPlanBatch, $matcher);
 
         DB::transaction(function () use ($request, $mealPlanBatch, $drafts, $data, $summary) {
+            $personalConflicts = $this->personalDinerConflictsFor($mealPlanBatch, $drafts);
+            if ($personalConflicts->isNotEmpty()) {
+                throw ValidationException::withMessages(['personal_conflicts' => ['A selected diner already has a personal meal in one or more of these slots. Change the household draft before saving.']]);
+            }
             $conflicts = $this->conflictsFor($request, $mealPlanBatch, $drafts);
             if ($conflicts->isNotEmpty()) {
                 if (($data['conflict_action'] ?? 'keep_existing') !== 'replace_conflicting') {
@@ -253,7 +257,15 @@ class MealPlanBatchController extends Controller
     {
         $batch->load(['mealPlans' => fn ($query) => $query->with('recipe.ingredients')->orderBy('planned_date')->orderBy('meal_type')]);
 
-        return ['batch' => $batch, 'meal_plans' => $batch->mealPlans, 'summary' => $this->summary($request, $batch, $matcher), 'conflicts' => $this->conflictsFor($request, $batch, $batch->mealPlans)->values()];
+        return [
+            'batch' => $batch,
+            'meal_plans' => $batch->mealPlans,
+            'summary' => $this->summary($request, $batch, $matcher),
+            'conflicts' => $this->conflictsFor($request, $batch, $batch->mealPlans)->values(),
+            // Never expose a household member's personal recipe. The UI only
+            // needs to know which selected diner and time slot must be changed.
+            'personal_conflicts' => $this->personalDinerConflictsFor($batch, $batch->mealPlans)->values(),
+        ];
     }
 
     private function summary(Request $request, MealPlanBatch $batch, RecipeMatcher $matcher): array
@@ -348,6 +360,63 @@ class MealPlanBatchController extends Controller
             ->when($batch->family_id === null, fn ($query) => $query->where('user_id', $request->user()->id))
             ->whereBetween('planned_date', [$batch->start_date, $batch->end_date])
             ->get()->filter(fn (MealPlan $plan) => in_array($plan->planned_date->toDateString().'|'.$plan->meal_type, $keys, true))->values();
+    }
+
+    /** Personal schedules remain private, but prevent double-booking a selected linked diner. */
+    private function personalDinerConflictsFor(MealPlanBatch $batch, $drafts)
+    {
+        if (! $batch->family_id) {
+            return collect();
+        }
+
+        $drafts = collect($drafts)->filter(fn (MealPlan $plan) => $plan->status === 'draft')->values();
+        $profileIds = $drafts->flatMap(fn (MealPlan $plan) => $plan->diner_profile_ids ?? [])->unique()->values();
+        if ($drafts->isEmpty() || $profileIds->isEmpty()) {
+            return collect();
+        }
+
+        $profiles = HouseholdProfile::where('family_id', $batch->family_id)
+            ->whereIn('id', $profileIds)
+            ->whereNotNull('user_id')
+            ->get(['id', 'user_id', 'name'])
+            ->keyBy('id');
+        if ($profiles->isEmpty()) {
+            return collect();
+        }
+
+        $slotProfiles = [];
+        foreach ($drafts as $draft) {
+            foreach ($draft->diner_profile_ids ?? [] as $profileId) {
+                $profile = $profiles->get($profileId);
+                if ($profile) {
+                    $slotProfiles[$profile->user_id.'|'.$draft->planned_date->toDateString().'|'.$draft->meal_type] = $profile;
+                }
+            }
+        }
+
+        return MealPlan::query()
+            ->where('status', 'scheduled')
+            ->whereNull('family_id')
+            ->whereIn('user_id', $profiles->pluck('user_id')->unique())
+            ->whereBetween('planned_date', [$batch->start_date, $batch->end_date])
+            ->get(['user_id', 'planned_date', 'meal_type'])
+            ->map(function (MealPlan $plan) use ($slotProfiles) {
+                $key = $plan->user_id.'|'.$plan->planned_date->toDateString().'|'.$plan->meal_type;
+                $profile = $slotProfiles[$key] ?? null;
+                if (! $profile) {
+                    return null;
+                }
+
+                return [
+                    'diner_profile_id' => $profile->id,
+                    'diner_name' => $profile->name,
+                    'planned_date' => $plan->planned_date->toDateString(),
+                    'meal_type' => $plan->meal_type,
+                ];
+            })
+            ->filter()
+            ->unique(fn (array $conflict) => $conflict['diner_profile_id'].'|'.$conflict['planned_date'].'|'.$conflict['meal_type'])
+            ->values();
     }
 
     private function pantryFor(Request $request, ?int $familyId)

@@ -45,6 +45,7 @@
       </section>
 
       <section *ngIf="!isCompleted" class="actions" aria-label="Meal actions">
+        <ion-button expand="block" (click)="startCooking()" [disabled]="actionPending">Start cooking mode</ion-button>
         <ion-button expand="block" fill="outline" (click)="openSwap()" [disabled]="actionPending">Swap this meal</ion-button>
         <ion-button expand="block" fill="outline" (click)="showExtra = true" [disabled]="actionPending">Add an extra to shopping list</ion-button>
         <ion-button expand="block" (click)="requestCook()" [disabled]="!preflight?.can_cook_from_pantry || actionPending">

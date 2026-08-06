@@ -117,6 +117,10 @@ class RecipeController extends Controller
         $filters = $request->validate([
             'region' => 'nullable|string|max:100',
             'q' => 'nullable|string|max:100',
+            'meal_type' => 'nullable|string|max:100',
+            'difficulty' => 'nullable|string|max:100',
+            'max_time' => 'nullable|integer|min:1|max:1440',
+            'per_page' => 'nullable|integer|min:1|max:50',
             'family_id' => 'nullable|integer|exists:families,id',
             'include_match' => 'nullable|boolean',
         ]);
@@ -129,6 +133,9 @@ class RecipeController extends Controller
 
         $recipes = Recipe::with('ingredients')
             ->when($filters['region'] ?? null, fn ($q, $region) => $q->where('region', $region))
+            ->when($filters['meal_type'] ?? null, fn ($q, $mealType) => $q->where('meal_type', $mealType))
+            ->when($filters['difficulty'] ?? null, fn ($q, $difficulty) => $q->where('difficulty', $difficulty))
+            ->when($filters['max_time'] ?? null, fn ($q, $maxTime) => $q->whereRaw('COALESCE(prep_time, 0) + COALESCE(cook_time, 0) <= ?', [$maxTime]))
             ->when($search !== '', fn ($q) => $q->where(function ($recipes) use ($search) {
                 $recipes->where('name', 'like', "%{$search}%")
                     ->orWhere('description', 'like', "%{$search}%")
@@ -138,7 +145,7 @@ class RecipeController extends Controller
             }));
 
         $this->excludeBlockedIngredients($recipes, $blockedIngredients);
-        $results = $recipes->orderBy('name')->paginate(20);
+        $results = $recipes->orderBy('name')->paginate($filters['per_page'] ?? 20)->withQueryString();
 
         if (! ($filters['include_match'] ?? false)) {
             return response()->json($results);
@@ -251,6 +258,7 @@ class RecipeController extends Controller
             'name' => $prefix.'string|max:255', 'description' => 'nullable|string', 'instructions' => ($partial ? 'sometimes|' : 'required|').'string', 'cooking_tips' => 'nullable|string', 'region' => 'nullable|string|max:255',
             'prep_time' => 'nullable|integer|min:0', 'cook_time' => 'nullable|integer|min:0', 'servings' => 'nullable|integer|min:1',
             'meal_type' => 'nullable|string|max:255', 'difficulty' => 'nullable|string|max:255', 'image' => 'nullable|string|max:2048',
+            'image_source_url' => 'nullable|url|max:2048', 'image_attribution' => 'nullable|string|max:500',
             'calories' => 'nullable|numeric|min:0', 'protein' => 'nullable|numeric|min:0', 'carbs' => 'nullable|numeric|min:0', 'fat' => 'nullable|numeric|min:0',
             'ingredients' => ($partial ? 'sometimes|' : 'required|').'array|min:1', 'ingredients.*.name' => 'required_with:ingredients|string|max:255',
             'ingredients.*.quantity' => 'nullable|string|max:255', 'ingredients.*.unit' => 'nullable|string|max:255', 'ingredients.*.nutrition_food_id' => 'nullable|integer|exists:nutrition_foods,id', 'ingredients.*.nutrition_grams' => 'nullable|numeric|gt:0|max:100000', 'ingredients.*.is_substitute' => 'nullable|boolean',

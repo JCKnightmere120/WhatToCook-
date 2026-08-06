@@ -46,6 +46,21 @@ class NutritionApiTest extends TestCase
             ->assertJsonPath('unmatched_ingredients.1.reason', 'nutrition_food_not_linked');
     }
 
+    public function test_partial_usda_nutrient_coverage_is_not_presented_as_complete(): void
+    {
+        $user = User::factory()->create();
+        $food = NutritionFood::create([
+            'description' => 'Partial food', 'normalized_name' => 'partial food', 'source' => 'usda',
+            'nutrients' => ['calories' => 100, 'protein' => 0, 'carbs' => 0, 'fat' => 0, 'fiber' => 0, 'sodium' => 0, 'sugar' => 0, 'available_nutrients' => ['calories']],
+        ]);
+        $recipe = Recipe::create(['name' => 'Partial nutrition', 'instructions' => 'Cook.', 'created_by' => $user->id]);
+        $recipe->ingredients()->create(['name' => 'Partial food', 'quantity' => '100', 'unit' => 'g', 'nutrition_food_id' => $food->id]);
+
+        $this->actingAs($user, 'sanctum')->getJson("/api/recipes/{$recipe->id}/nutrition")
+            ->assertOk()->assertJsonPath('is_complete', true)->assertJsonPath('is_nutrition_complete', false)
+            ->assertJsonPath('data_status', 'partial')->assertJsonPath('unknown_nutrients.protein.0', 'Partial food');
+    }
+
     public function test_usda_food_is_cached_and_linked_to_an_ingredient_server_side(): void
     {
         $user = User::factory()->create();

@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { forkJoin } from 'rxjs';
-import { ApiService, Family, ShoppingListItem } from '../services/api.service';
+import { ApiService, ConfirmedPurchase, Family, ShoppingListItem } from '../services/api.service';
 import { AuthService } from '../services/auth.service';
 import { HouseholdContextService } from '../services/household-context.service';
 
@@ -15,6 +15,9 @@ export class ShoppingListPage {
   loading = false;
   markingAll = false;
   confirmMarkAll = false;
+  purchaseItem?: ShoppingListItem;
+  purchase: ConfirmedPurchase = this.emptyPurchase();
+  confirmingPurchase = false;
   readonly markAllAlertButtons = [
     { text: 'Cancel', role: 'cancel' },
     { text: 'Mark all bought', role: 'confirm', handler: () => this.markAllBought() },
@@ -57,6 +60,30 @@ export class ShoppingListPage {
     });
   }
 
+  beginPurchase(item: ShoppingListItem): void {
+    this.purchaseItem = item;
+    this.purchase = { ...this.emptyPurchase(), name: item.ingredient_name, quantity: item.quantity || '', unit: item.unit || '' };
+  }
+
+  confirmPurchase(): void {
+    if (!this.purchaseItem || !this.purchase.quantity || !this.purchase.unit.trim()) {
+      this.message = 'Confirm a positive quantity and unit before adding stock.';
+      return;
+    }
+    this.confirmingPurchase = true;
+    this.api.confirmShoppingPurchase(this.purchaseItem.id, this.purchase).subscribe({
+      next: result => {
+        this.items = this.items.map(item => item.id === result.shopping_item.id ? result.shopping_item : item);
+        this.message = result.message;
+        this.purchaseItem = undefined;
+        this.confirmingPurchase = false;
+      },
+      error: error => { this.confirmingPurchase = false; this.message = error?.error?.message || 'Could not confirm this purchase.'; },
+    });
+  }
+
+  cancelPurchase(): void { this.purchaseItem = undefined; }
+
   markAllBought(): void {
     const remaining = this.remainingItems;
     this.confirmMarkAll = false;
@@ -74,4 +101,6 @@ export class ShoppingListPage {
       error: () => this.message = 'Could not remove the item.',
     });
   }
+
+  private emptyPurchase(): ConfirmedPurchase { return { confirmed: true, quantity: '', unit: '', purchase_date: new Date().toISOString().slice(0, 10), expiry_date: null, purchase_source: 'unknown', storage_type: 'unknown' }; }
 }

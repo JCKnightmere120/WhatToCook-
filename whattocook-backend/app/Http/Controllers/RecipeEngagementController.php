@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 
 class RecipeEngagementController extends Controller
 {
-    public function favorites(Request $request) { return response()->json(Recipe::whereHas('favorites', fn ($q) => $q->where('user_id', $request->user()->id))->with('ingredients')->get()); }
+    public function favorites(Request $request) { return response()->json(Recipe::whereHas('favorites', fn ($q) => $q->where('user_id', $request->user()->id))->with('ingredients')->orderBy('name')->get()); }
     public function favorite(Request $request, Recipe $recipe) { RecipeFavorite::firstOrCreate(['user_id' => $request->user()->id, 'recipe_id' => $recipe->id]); return response()->noContent(); }
     public function unfavorite(Request $request, Recipe $recipe) { RecipeFavorite::where(['user_id' => $request->user()->id, 'recipe_id' => $recipe->id])->delete(); return response()->noContent(); }
     public function reviews(Recipe $recipe) { return response()->json($recipe->reviews()->with('user:id,name')->latest()->get()); }

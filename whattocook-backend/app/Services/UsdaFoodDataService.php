@@ -57,7 +57,8 @@ class UsdaFoodDataService
 
     public function normalizeNutrients(array $foodNutrients): array
     {
-        $result = ['calories' => 0, 'protein' => 0, 'carbs' => 0, 'fat' => 0, 'fiber' => 0, 'sodium' => 0, 'sugar' => 0];
+        // Zero is valid; it must not stand in for a value USDA did not provide.
+        $result = ['calories' => 0, 'protein' => 0, 'carbs' => 0, 'fat' => 0, 'fiber' => 0, 'sodium' => 0, 'sugar' => 0, 'available_nutrients' => []];
         foreach ($foodNutrients as $item) {
             $name = strtolower($item['nutrient']['name'] ?? $item['nutrientName'] ?? '');
             $id = $item['nutrient']['id'] ?? $item['nutrientId'] ?? null;
@@ -74,8 +75,11 @@ class UsdaFoodDataService
             };
             if ($key !== null) {
                 $result[$key] = (float) $value;
+                $result['available_nutrients'][] = $key;
             }
         }
+
+        $result['available_nutrients'] = array_values(array_unique($result['available_nutrients']));
 
         return $result;
     }

@@ -78,6 +78,7 @@ class MealPlanController extends Controller
     public function store(Request $request)
     {
         $data = $this->data($request);
+        $this->assertNoPersonalDinerConflict($data['family_id'] ?? null, $data['diner_profile_ids'] ?? [], $data['planned_date'], $data['meal_type']);
 
         return response()->json(MealPlan::create($data + ['user_id' => $request->user()->id]), 201);
     }
@@ -86,7 +87,15 @@ class MealPlanController extends Controller
     {
         $this->owns($request, $mealPlan);
         abort_if($mealPlan->completed_at, 422, 'A cooked meal cannot be changed. Create a new meal instead.');
-        $mealPlan->update($this->data($request, true));
+        $data = $this->data($request, true, $mealPlan);
+        $this->assertNoPersonalDinerConflict(
+            $data['family_id'] ?? $mealPlan->family_id,
+            $data['diner_profile_ids'] ?? $mealPlan->diner_profile_ids ?? [],
+            $data['planned_date'] ?? $mealPlan->planned_date->toDateString(),
+            $data['meal_type'] ?? $mealPlan->meal_type,
+            $mealPlan->id,
+        );
+        $mealPlan->update($data);
 
         return response()->json($mealPlan);
     }
@@ -113,7 +122,8 @@ class MealPlanController extends Controller
         $this->owns($request, $mealPlan);
         $this->assertSavedMeal($mealPlan);
         abort_if($mealPlan->completed_at, 422, 'This meal has already been cooked.');
-        $plan = DB::transaction(function () use ($mealPlan, $request, $matcher) {
+        $completion = $request->validate(['notes' => 'sometimes|nullable|string|max:5000']);
+        $plan = DB::transaction(function () use ($mealPlan, $request, $matcher, $completion) {
             $mealPlan = MealPlan::query()->lockForUpdate()->findOrFail($mealPlan->id);
             $this->assertSavedMeal($mealPlan);
             abort_if($mealPlan->completed_at, 422, 'This meal has already been cooked.');
@@ -165,7 +175,7 @@ class MealPlanController extends Controller
                 'consumed_items' => $consumed,
                 'status' => 'completed',
             ]);
-            $this->recordMealHistory($request, $mealPlan);
+            $this->recordMealHistory($request, $mealPlan, $completion['notes'] ?? null);
 
             return $mealPlan->fresh()->load('recipe');
         });
@@ -219,7 +229,8 @@ class MealPlanController extends Controller
         $this->assertSavedMeal($mealPlan);
         abort_if($mealPlan->completed_at, 422, 'This meal has already been cooked.');
 
-        $plan = DB::transaction(function () use ($request, $mealPlan) {
+        $completion = $request->validate(['notes' => 'sometimes|nullable|string|max:5000']);
+        $plan = DB::transaction(function () use ($request, $mealPlan, $completion) {
             $mealPlan = MealPlan::query()->lockForUpdate()->findOrFail($mealPlan->id);
             $this->assertSavedMeal($mealPlan);
             abort_if($mealPlan->completed_at, 422, 'This meal has already been cooked.');
@@ -229,7 +240,7 @@ class MealPlanController extends Controller
                 'completion_method' => 'without_pantry_deduction',
                 'status' => 'completed',
             ]);
-            $this->recordMealHistory($request, $mealPlan);
+            $this->recordMealHistory($request, $mealPlan, $completion['notes'] ?? null);
 
             return $mealPlan->fresh()->load('recipe');
         });
@@ -354,7 +365,7 @@ class MealPlanController extends Controller
         return response()->json(['meal_plans' => $plans, 'start_date' => $start->toDateString(), 'end_date' => $end->toDateString()], 201);
     }
 
-    private function data(Request $request, bool $partial = false): array
+    private function data(Request $request, bool $partial = false, ?MealPlan $existing = null): array
     {
         $p = $partial ? 'sometimes|' : 'required|';
         $data = $request->validate([
@@ -362,12 +373,13 @@ class MealPlanController extends Controller
             'family_id' => 'nullable|exists:families,id', 'servings' => ($partial ? 'sometimes|' : 'nullable|').'integer|min:1|max:100',
             'diner_profile_ids' => 'sometimes|nullable|array', 'diner_profile_ids.*' => 'integer|distinct',
         ]);
-        $this->canUseFamily($request, $data['family_id'] ?? null);
+        $familyId = $data['family_id'] ?? $existing?->family_id;
+        $this->canUseFamily($request, $familyId);
         if (array_key_exists('diner_profile_ids', $data)) {
-            $data['diner_profile_ids'] = $this->validatedDiners($data['family_id'] ?? null, $data['diner_profile_ids'] ?? []);
+            $data['diner_profile_ids'] = $this->validatedDiners($familyId, $data['diner_profile_ids'] ?? []);
         }
         if (array_key_exists('recipe_id', $data)) {
-            $isSafe = $this->safeRecipesFor($request, $data['family_id'] ?? null, $data['diner_profile_ids'] ?? [])->contains('id', $data['recipe_id']);
+            $isSafe = $this->safeRecipesFor($request, $familyId, $data['diner_profile_ids'] ?? $existing?->diner_profile_ids ?? [])->contains('id', $data['recipe_id']);
             if (! $isSafe) {
                 throw ValidationException::withMessages(['recipe_id' => ['This recipe conflicts with the active diner profile or dietary restrictions.']]);
             }
@@ -377,6 +389,34 @@ class MealPlanController extends Controller
         }
 
         return $data;
+    }
+
+    /** A shared meal must not silently double-book a linked member's private plan. */
+    private function assertNoPersonalDinerConflict(?int $familyId, array $dinerIds, string $plannedDate, string $mealType, ?int $ignorePlanId = null): void
+    {
+        if (! $familyId || ! $dinerIds) {
+            return;
+        }
+
+        $userIds = HouseholdProfile::where('family_id', $familyId)
+            ->whereIn('id', $dinerIds)
+            ->whereNotNull('user_id')
+            ->pluck('user_id');
+        if ($userIds->isEmpty()) {
+            return;
+        }
+
+        $conflict = MealPlan::query()
+            ->where('status', 'scheduled')
+            ->whereNull('family_id')
+            ->whereIn('user_id', $userIds)
+            ->whereDate('planned_date', $plannedDate)
+            ->where('meal_type', $mealType)
+            ->when($ignorePlanId, fn ($query) => $query->whereKeyNot($ignorePlanId))
+            ->exists();
+        if ($conflict) {
+            throw ValidationException::withMessages(['personal_conflicts' => ['A selected diner already has a personal meal in this date and meal slot. Change the household meal before saving.']]);
+        }
     }
 
     private function owns(Request $request, MealPlan $plan): void
@@ -456,7 +496,7 @@ class MealPlanController extends Controller
     }
 
     /** Create exactly one history row per completed meal plan. */
-    private function recordMealHistory(Request $request, MealPlan $mealPlan): void
+    private function recordMealHistory(Request $request, MealPlan $mealPlan, ?string $notes = null): void
     {
         MealHistory::firstOrCreate([
             'meal_plan_id' => $mealPlan->id,
@@ -466,6 +506,7 @@ class MealPlanController extends Controller
             'recipe_id' => $mealPlan->recipe_id,
             'prepared_at' => now()->toDateString(),
             'servings' => $mealPlan->servings,
+            'notes' => $notes,
         ]);
     }
 

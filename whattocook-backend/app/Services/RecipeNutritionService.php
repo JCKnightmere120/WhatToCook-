@@ -15,6 +15,7 @@ class RecipeNutritionService
         $recipe->loadMissing('ingredients.nutritionFood');
         $totals = array_fill_keys(self::NUTRIENTS, 0.0);
         $unmatched = [];
+        $unknownNutrients = array_fill_keys(self::NUTRIENTS, []);
 
         foreach ($recipe->ingredients as $ingredient) {
             $grams = $this->gramsFor($ingredient);
@@ -24,6 +25,10 @@ class RecipeNutritionService
                 continue;
             }
             foreach (self::NUTRIENTS as $nutrient) {
+                if (! $this->hasNutrient($ingredient->nutritionFood->nutrients ?? [], $nutrient, $ingredient->nutritionFood->source)) {
+                    $unknownNutrients[$nutrient][] = $ingredient->name;
+                    continue;
+                }
                 $totals[$nutrient] += ((float) ($ingredient->nutritionFood->nutrients[$nutrient] ?? 0)) * $grams / 100;
             }
         }
@@ -31,13 +36,22 @@ class RecipeNutritionService
         $servings = max(1, (int) ($recipe->servings ?: 1));
         $round = fn (array $values) => collect($values)->map(fn ($value) => round($value, 2))->all();
 
+        $unknownNutrients = collect($unknownNutrients)->filter()->map(fn ($ingredients) => array_values(array_unique($ingredients)))->all();
+        $ingredientCoverageComplete = $unmatched === [];
+        $nutritionComplete = $ingredientCoverageComplete && $unknownNutrients === [];
+
         return [
             'recipe_id' => $recipe->id,
             'servings' => $servings,
             'totals' => $round($totals),
             'per_serving' => $round(collect($totals)->map(fn ($value) => $value / $servings)->all()),
             'unmatched_ingredients' => $unmatched,
-            'is_complete' => $unmatched === [],
+            // Retained for existing clients: all ingredients were included.
+            'is_complete' => $ingredientCoverageComplete,
+            'is_nutrition_complete' => $nutritionComplete,
+            'data_status' => $nutritionComplete ? 'complete' : ($ingredientCoverageComplete ? 'partial' : 'incomplete'),
+            'unknown_nutrients' => $unknownNutrients,
+            'disclaimer' => 'Nutrition is an estimate from linked food records, not medical advice. Do not use partial results for medical decisions.',
         ];
     }
 
@@ -83,5 +97,16 @@ class RecipeNutritionService
         }
 
         return null;
+    }
+
+    private function hasNutrient(array $nutrients, string $nutrient, ?string $source): bool
+    {
+        if (array_key_exists('available_nutrients', $nutrients)) {
+            return in_array($nutrient, $nutrients['available_nutrients'] ?? [], true);
+        }
+
+        // Local records created before coverage tracking have explicit keys.
+        // Legacy USDA caches cannot be verified safely.
+        return $source !== 'usda' && array_key_exists($nutrient, $nutrients);
     }
 }
