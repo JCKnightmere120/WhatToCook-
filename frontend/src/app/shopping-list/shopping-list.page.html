@@ -23,11 +23,25 @@
       <ion-button size="small" fill="outline" (click)="confirmMarkAll = true" [disabled]="!remainingItems.length || markingAll">{{ markingAll ? 'Updating…' : 'Mark all remaining bought' }}</ion-button>
     </section>
 
+    <ion-card *ngIf="purchaseItem" class="purchase-review">
+      <ion-card-header><ion-card-title>Confirm purchase</ion-card-title><ion-card-subtitle>Review this item before it creates stock in the {{ household ? household.name + ' shared' : 'personal' }} pantry.</ion-card-subtitle></ion-card-header>
+      <ion-card-content>
+        <ion-input label="Ingredient" labelPlacement="stacked" [(ngModel)]="purchase.name"></ion-input>
+        <ion-grid><ion-row><ion-col><ion-input label="Quantity" labelPlacement="stacked" type="number" min="0.001" [(ngModel)]="purchase.quantity"></ion-input></ion-col><ion-col><ion-input label="Unit" labelPlacement="stacked" [(ngModel)]="purchase.unit"></ion-input></ion-col></ion-row></ion-grid>
+        <ion-grid><ion-row><ion-col><ion-input label="Purchased on" labelPlacement="stacked" type="date" [(ngModel)]="purchase.purchase_date"></ion-input></ion-col><ion-col><ion-input label="Printed expiry (optional)" labelPlacement="stacked" type="date" [(ngModel)]="purchase.expiry_date"></ion-input></ion-col></ion-row></ion-grid>
+        <ion-select label="Storage" labelPlacement="stacked" [(ngModel)]="purchase.storage_type"><ion-select-option value="unknown">Unknown</ion-select-option><ion-select-option value="room_temperature">Room temperature</ion-select-option><ion-select-option value="refrigerated">Refrigerated</ion-select-option><ion-select-option value="frozen">Frozen</ion-select-option></ion-select>
+        <p class="hint">Without a printed expiry, WhatToCook adds a clearly marked estimate and freshness-review date.</p>
+        <ion-button expand="block" (click)="confirmPurchase()" [disabled]="confirmingPurchase">{{ confirmingPurchase ? 'Adding stock…' : 'Confirm & add to pantry' }}</ion-button>
+        <ion-button expand="block" fill="clear" color="medium" (click)="cancelPurchase()" [disabled]="confirmingPurchase">Cancel</ion-button>
+      </ion-card-content>
+    </ion-card>
+
     <ion-spinner *ngIf="loading"></ion-spinner>
     <ion-list *ngIf="!loading">
       <ion-item *ngFor="let item of items">
         <ion-checkbox slot="start" [checked]="item.is_purchased" (ionChange)="toggle(item)" aria-label="Mark {{ item.ingredient_name }} as bought"></ion-checkbox>
         <ion-label [class.done]="item.is_purchased">{{ item.ingredient_name }}<p>{{ item.quantity || '' }} {{ item.unit || '' }}</p></ion-label>
+        <ion-button *ngIf="!item.is_purchased" fill="outline" size="small" slot="end" (click)="beginPurchase(item)">Buy & add</ion-button>
         <ion-button fill="clear" color="danger" slot="end" (click)="remove(item)" aria-label="Remove {{ item.ingredient_name }}"><ion-icon name="trash-outline"></ion-icon></ion-button>
       </ion-item>
     </ion-list>

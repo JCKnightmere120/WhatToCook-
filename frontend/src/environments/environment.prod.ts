@@ -1,7 +1,7 @@
 export const environment = {
   production: true,
-  // Browser builds use the same HTTPS origin as the deployed API.
-  apiBaseUrl: '/api',
-  // Set the actual HTTPS API host before creating a native Android release.
-  androidApiBaseUrl: 'https://api.example.com/api'
+  // Template only. `npm run build` generates the production environment from
+  // WHATTOCOOK_API_BASE_URL; do not ship this file directly.
+  apiBaseUrl: 'https://api.example.invalid/api',
+  androidApiBaseUrl: 'https://api.example.invalid/api'
 };

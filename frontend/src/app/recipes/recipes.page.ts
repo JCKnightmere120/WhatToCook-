@@ -1,28 +1,26 @@
 import { Component, OnDestroy } from '@angular/core';
-import { ApiService, Family, PackageItem, Recommendation, RecipeDetail, RecipeIngredient, RecipeNutrition, RecipeReview } from '../services/api.service';
+import { Router } from '@angular/router';
+import { ApiService, Family, PackageItem, Recommendation, RecipeIngredient } from '../services/api.service';
 import { AuthService } from '../services/auth.service';
 import { HouseholdContextService } from '../services/household-context.service';
 
 @Component({ selector: 'app-recipes', templateUrl: 'recipes.page.html', styleUrls: ['recipes.page.scss'], standalone: false })
 export class RecipesPage implements OnDestroy {
   recipes: Recommendation[] = [];
-  searchResults: Recommendation[] = [];
   loading = false;
-  searching = false;
+  loadingMore = false;
   searchError = '';
   message = '';
-  selectedRecipe?: RecipeDetail;
-  selectedRecommendation?: Recommendation;
-  nutrition?: RecipeNutrition;
-  servings = 2;
   favorites = new Set<number>();
-  reviews: RecipeReview[] = [];
-  rating = 5;
-  reviewComment = '';
   householdName = '';
   families: Family[] = [];
   cookingScope: 'personal' | number = 'personal';
   searchTerm = '';
+  mealType = '';
+  difficulty = '';
+  maxTime?: number;
+  currentPage = 1;
+  lastPage = 1;
   confirmingIngredient?: RecipeIngredient;
   confirmingPackage?: PackageItem;
   packageAmount?: number;
@@ -30,128 +28,83 @@ export class RecipesPage implements OnDestroy {
   savingConversion = false;
   private activeFamilyId?: number;
   private searchTimer?: ReturnType<typeof setTimeout>;
-  private searchSequence = 0;
 
-  constructor(private api: ApiService, private householdContext: HouseholdContextService, private auth: AuthService) {}
-  ionViewWillEnter() { this.loadRecipeRecommendations(); }
-  ngOnDestroy(): void {
-    if (this.searchTimer) clearTimeout(this.searchTimer);
+  constructor(private api: ApiService, private householdContext: HouseholdContextService, private auth: AuthService, private router: Router) {}
+  ionViewWillEnter(): void { this.loadRecipeDiscovery(); }
+  ngOnDestroy(): void { if (this.searchTimer) clearTimeout(this.searchTimer); }
+
+  get cookingScopeDescription(): string {
+    return this.activeFamilyId ? `${this.householdName}'s shared pantry and household dietary safety rules are used.` : 'Only your personal pantry and your own dietary preferences are used.';
   }
+  get hasMore(): boolean { return this.currentPage < this.lastPage; }
 
-  get hasSearch(): boolean { return !!this.searchTerm.trim(); }
-  get displayedRecipes(): Recommendation[] { return this.hasSearch ? this.searchResults : this.recipes; }
-
-  onSearchChanged(value: string): void {
-    const query = value.trim();
-    const sequence = ++this.searchSequence;
+  onSearchChanged(): void {
     if (this.searchTimer) clearTimeout(this.searchTimer);
-    this.searchError = '';
-
-    if (!query) {
-      this.searchResults = [];
-      this.searching = false;
-      return;
-    }
-
-    this.searchResults = [];
-    this.searching = true;
-    this.searchTimer = setTimeout(() => this.searchRecipes(query, sequence), 300);
+    this.searchTimer = setTimeout(() => this.loadRecipes(), 300);
   }
+  applyFilters(): void { this.loadRecipes(); }
 
-  loadRecipeRecommendations(): void {
+  loadRecipeDiscovery(): void {
     const userId = this.auth.user?.id;
-    if (!this.api.hasToken || !userId) { this.message = 'Connect your account on Home to see recipe matches.'; return; }
-    ++this.searchSequence;
-    if (this.searchTimer) clearTimeout(this.searchTimer);
-    this.loading = true; this.message = '';
+    if (!this.api.hasToken || !userId) { this.message = 'Connect your account on Home to browse recipes.'; return; }
+    this.loading = true;
     this.householdContext.refresh(userId).subscribe({
       next: context => {
         this.families = context.families;
-        // Recipe discovery owns this choice. The app-wide context remains the
-        // selected household for Home and meal planning.
-        const selectedFamily = this.selectedRecipeFamily(context.families);
-        this.activeFamilyId = selectedFamily?.id;
-        this.householdName = selectedFamily?.name || '';
-        this.api.recommendations(this.activeFamilyId).subscribe({
-          next: result => {
-            this.recipes = result.recommendations;
-            this.loading = false;
-            if (this.hasSearch) this.onSearchChanged(this.searchTerm);
-          },
-          error: () => { this.message = 'Could not load recipe recommendations.'; this.loading = false; },
-        });
+        const selected = this.cookingScope === 'personal' ? undefined : context.families.find(family => family.id === Number(this.cookingScope));
+        this.activeFamilyId = selected?.id;
+        this.householdName = selected?.name || '';
+        this.loadFavorites();
+        this.loadRecipes();
       },
       error: () => { this.message = 'Could not load your household context.'; this.loading = false; },
     });
   }
+
   changeCookingScope(): void {
-    const family = this.cookingScope === 'personal'
-      ? null
-      : this.families.find(item => item.id === Number(this.cookingScope)) || null;
-    this.householdName = family?.name || '';
+    const family = this.cookingScope === 'personal' ? undefined : this.families.find(item => item.id === Number(this.cookingScope));
     this.activeFamilyId = family?.id;
-    this.recipes = [];
-    this.searchResults = [];
-    this.searchError = '';
-    this.loading = true;
-    this.api.recommendations(this.activeFamilyId).subscribe({
-      next: result => {
-        this.recipes = result.recommendations;
-        this.loading = false;
-        if (this.hasSearch) this.onSearchChanged(this.searchTerm);
-      },
-      error: () => {
-        this.message = 'Could not load recipe recommendations.';
-        this.loading = false;
-      },
-    });
+    this.householdName = family?.name || '';
+    this.loadRecipes();
   }
 
-  get cookingScopeDescription(): string {
-    return this.activeFamilyId
-      ? `${this.householdName}'s shared pantry and household dietary safety rules are used.`
-      : 'Only your personal pantry and your own dietary preferences are used.';
+  loadMore(): void { if (this.hasMore && !this.loadingMore) this.loadRecipes(this.currentPage + 1, true); }
+  showRecipeDetails(recipe: Recommendation): void { this.router.navigate(['/recipes', recipe.recipe.id]); }
+  addMissingIngredientsToShoppingList(recipe: Recommendation): void { this.api.addMissingToList(recipe.recipe.id, this.activeFamilyId).subscribe({ next: () => this.message = `${recipe.recipe.name}: missing ingredients added to your shopping list.`, error: () => this.message = 'Could not update the shopping list.' }); }
+  toggleFavorite(recipe: Recommendation): void {
+    const id = recipe.recipe.id;
+    const isFavorite = this.favorites.has(id);
+    (isFavorite ? this.api.unfavoriteRecipe(id) : this.api.favoriteRecipe(id)).subscribe({
+      next: () => isFavorite ? this.favorites.delete(id) : this.favorites.add(id),
+      error: () => this.message = 'Could not update favorites.',
+    });
   }
-  addMissingIngredientsToShoppingList(recipe: Recommendation) { this.api.addMissingToList(recipe.recipe.id, this.activeFamilyId).subscribe({ next: () => this.message = `${recipe.recipe.name}: missing ingredients added to your shopping list.`, error: () => this.message = 'Could not update the shopping list.' }); }
-  openPackageConfirmation(ingredient: RecipeIngredient): void {
-    const item = ingredient.package_items?.[0];
-    if (!item) return;
-    this.confirmingIngredient = ingredient; this.confirmingPackage = item; this.packageAmount = undefined; this.packageUnit = ingredient.unit || 'g';
-  }
+  recipeImage(recipe: Recommendation): string { return recipe.recipe.image || 'assets/shapes.svg'; }
+  useFallbackImage(event: Event): void { (event.target as HTMLImageElement).src = 'assets/shapes.svg'; }
+  openPackageConfirmation(ingredient: RecipeIngredient): void { const item = ingredient.package_items?.[0]; if (!item) return; this.confirmingIngredient = ingredient; this.confirmingPackage = item; this.packageAmount = undefined; this.packageUnit = ingredient.unit || 'g'; }
   closePackageConfirmation(): void { this.confirmingIngredient = undefined; this.confirmingPackage = undefined; }
   savePackageConversion(): void {
     if (!this.confirmingPackage || !this.packageAmount || this.packageAmount <= 0 || this.savingConversion) return;
     this.savingConversion = true;
     this.api.confirmPackageConversion(this.confirmingPackage.id, this.packageAmount, this.packageUnit).subscribe({
-      next: result => { this.savingConversion = false; this.message = result.message; this.closePackageConfirmation(); this.loadRecipeRecommendations(); },
+      next: result => { this.savingConversion = false; this.message = result.message; this.closePackageConfirmation(); this.loadRecipes(); },
       error: () => { this.savingConversion = false; this.message = 'Could not save that package conversion.'; },
     });
   }
-  showRecipeDetails(recipe: Recommendation) { this.selectedRecommendation = recipe; this.nutrition = undefined; this.servings = recipe.recipe.servings || 2; this.api.recipe(recipe.recipe.id).subscribe({ next: detail => { this.selectedRecipe = detail; this.loadReviews(detail.id); this.api.recipeNutrition(detail.id).subscribe({ next: nutrition => this.nutrition = nutrition, error: () => this.nutrition = undefined }); }, error: () => this.message = 'Could not load this recipe.' }); }
-  closeRecipeDetails() { this.selectedRecipe = undefined; this.selectedRecommendation = undefined; this.nutrition = undefined; this.reviews = []; this.reviewComment = ''; }
-  ingredientQuantity(quantity?: string): string { const value = Number(quantity); if (!quantity || Number.isNaN(value)) return quantity || ''; const base = this.selectedRecipe?.servings || this.selectedRecommendation?.recipe.servings || 2; return String(Math.round(value * this.servings / base * 100) / 100); }
-  toggleFavorite(recipe: Recommendation): void { const id = recipe.recipe.id; const request = this.favorites.has(id) ? this.api.unfavoriteRecipe(id) : this.api.favoriteRecipe(id); request.subscribe({ next: () => this.favorites.has(id) ? this.favorites.delete(id) : this.favorites.add(id), error: () => this.message = 'Could not update favorites.' }); }
-  submitReview(): void { if (!this.selectedRecipe) return; this.api.reviewRecipe(this.selectedRecipe.id, this.rating, this.reviewComment).subscribe({ next: () => { this.reviewComment = ''; this.loadReviews(this.selectedRecipe!.id); }, error: () => this.message = 'Could not save your rating.' }); }
-  private loadReviews(recipeId: number): void { this.api.recipeReviews(recipeId).subscribe({ next: response => this.reviews = Array.isArray(response) ? response : response.reviews || [], error: () => this.reviews = [] }); }
-  private searchRecipes(query: string, sequence: number): void {
-    this.api.searchRecipes(query, this.activeFamilyId).subscribe({
+
+  private loadRecipes(page = 1, append = false): void {
+    if (!append) { this.loading = true; this.searchError = ''; }
+    else this.loadingMore = true;
+    this.api.searchRecipes(this.searchTerm.trim(), this.activeFamilyId, { mealType: this.mealType, difficulty: this.difficulty, maxTime: this.maxTime, page }).subscribe({
       next: response => {
-        if (sequence !== this.searchSequence) return;
-        this.searchResults = response.data;
-        this.searching = false;
+        this.recipes = append ? [...this.recipes, ...response.data] : response.data;
+        this.currentPage = response.current_page;
+        this.lastPage = response.last_page;
+        this.loading = false;
+        this.loadingMore = false;
       },
-      error: () => {
-        if (sequence !== this.searchSequence) return;
-        this.searchResults = [];
-        this.searchError = 'Could not search menus right now. Check your connection and try again.';
-        this.searching = false;
-      },
+      error: () => { this.searchError = 'Could not load recipes right now. Check your connection and try again.'; this.loading = false; this.loadingMore = false; },
     });
   }
-
-  private selectedRecipeFamily(families: Family[]): Family | undefined {
-    return this.cookingScope === 'personal'
-      ? undefined
-      : families.find(family => family.id === Number(this.cookingScope));
-  }
+  private loadFavorites(): void { this.api.favorites().subscribe({ next: recipes => this.favorites = new Set(recipes.map(recipe => recipe.id)), error: () => this.favorites = new Set() }); }
 }

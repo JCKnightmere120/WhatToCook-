@@ -42,7 +42,9 @@ class NutritionController extends Controller
             'nutrients.sodium' => 'nullable|numeric|min:0',
             'nutrients.sugar' => 'nullable|numeric|min:0',
         ]);
+        $provided = array_keys(array_filter($data['nutrients'], fn ($value) => $value !== null));
         $nutrients = array_merge(array_fill_keys(['calories', 'protein', 'carbs', 'fat', 'fiber', 'sodium', 'sugar'], 0), $data['nutrients']);
+        $nutrients['available_nutrients'] = $provided;
         $food = NutritionFood::updateOrCreate(
             ['normalized_name' => Str::lower(trim($data['description'])), 'source' => 'local'],
             ['description' => $data['description'], 'nutrients' => $nutrients, 'fetched_at' => now()]

@@ -7,7 +7,10 @@ use App\Models\PantryItem;
 use App\Models\Recipe;
 use App\Models\ShoppingList;
 use App\Services\RecipeMatcher;
+use App\Services\ConfirmedPurchaseService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class ShoppingListController extends Controller
 {
@@ -20,6 +23,20 @@ class ShoppingListController extends Controller
     {
         $data = $this->data($request);
 
+        $existing = ShoppingList::where('user_id', $request->user()->id)
+            ->where('family_id', $data['family_id'] ?? null)
+            ->where('is_purchased', false)
+            ->whereRaw('LOWER(ingredient_name) = ?', [strtolower($data['ingredient_name'])])
+            ->whereRaw('LOWER(COALESCE(unit, \'\')) = ?', [strtolower($data['unit'] ?? '')])
+            ->first();
+        if ($existing) {
+            if (is_numeric($existing->quantity) && is_numeric($data['quantity'] ?? null)) {
+                $existing->update(['quantity' => (string) round((float) $existing->quantity + (float) $data['quantity'], 3)]);
+            }
+
+            return response()->json($existing->fresh());
+        }
+
         return response()->json(ShoppingList::create($data + ['user_id' => $request->user()->id]), 201);
     }
 
@@ -29,6 +46,30 @@ class ShoppingListController extends Controller
         $shoppingList->update($this->data($request, true));
 
         return response()->json($shoppingList);
+    }
+
+    public function confirmPurchase(Request $request, ShoppingList $shoppingList, ConfirmedPurchaseService $purchases)
+    {
+        $this->owns($request, $shoppingList);
+        $data = $request->validate([
+            // This intentional acknowledgement is the safety boundary: a
+            // purchased checkbox never creates pantry stock by itself.
+            'confirmed' => ['required', 'accepted'],
+            'name' => 'sometimes|string|max:255', 'quantity' => 'sometimes|numeric|gt:0|max:999999999.999',
+            'unit' => 'sometimes|string|max:50', 'purchase_date' => 'sometimes|date', 'expiry_date' => 'sometimes|nullable|date',
+            'freshness_review_date' => 'sometimes|nullable|date',
+            'purchase_source' => ['sometimes', Rule::in(['supermarket', 'sari_sari_store', 'wet_market', 'homegrown', 'leftover', 'unknown'])],
+            'storage_type' => ['sometimes', Rule::in(['room_temperature', 'refrigerated', 'frozen', 'other', 'unknown'])],
+            'freshness_condition' => ['sometimes', Rule::in(['fresh', 'good', 'uncertain', 'unknown'])],
+        ]);
+
+        return DB::transaction(function () use ($request, $shoppingList, $data, $purchases) {
+            $item = ShoppingList::lockForUpdate()->findOrFail($shoppingList->id);
+            abort_if($item->is_purchased, 422, 'This purchase was already confirmed.');
+            $pantry = $purchases->record($item, $data, $request->user()->id);
+            $item->update(['is_purchased' => true]);
+            return response()->json(['shopping_item' => $item->fresh(), 'pantry_item' => $pantry, 'message' => 'Purchase confirmed and added to the correct pantry.']);
+        });
     }
 
     public function destroy(Request $request, ShoppingList $shoppingList)
@@ -84,6 +125,13 @@ class ShoppingListController extends Controller
         $p = $partial ? 'sometimes|' : 'required|';
         $data = $request->validate(['ingredient_name' => $p.'string|max:255', 'quantity' => 'sometimes|nullable|string|max:255', 'unit' => 'sometimes|nullable|string|max:255', 'is_purchased' => 'sometimes|boolean', 'family_id' => 'sometimes|nullable|exists:families,id']);
         $this->canUseFamily($request, $data['family_id'] ?? null);
+
+        if (array_key_exists('ingredient_name', $data)) {
+            $data['ingredient_name'] = app(\App\Services\IngredientCatalogService::class)->approvedCanonicalName($data['ingredient_name']) ?? trim($data['ingredient_name']);
+        }
+        if (array_key_exists('unit', $data) && $data['unit'] !== null) {
+            $data['unit'] = app(ConfirmedPurchaseService::class)->normaliseUnit($data['unit']);
+        }
 
         return $data;
     }

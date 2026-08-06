@@ -69,12 +69,18 @@ class PantryInputService
         $text = preg_replace('/\b(i have|add|please add|we bought)\b/', '', $text) ?? $text;
         $numberWords = ['one' => '1', 'two' => '2', 'three' => '3', 'four' => '4', 'five' => '5', 'six' => '6', 'seven' => '7', 'eight' => '8', 'nine' => '9', 'ten' => '10'];
         $text = preg_replace_callback('/\b('.implode('|', array_keys($numberWords)).')\b/', fn ($match) => $numberWords[$match[1]], $text) ?? $text;
-        $lines = preg_split('/[\r\n,;]+|\s+and\s+/', $text) ?: [];
+        // Keep receipt lines intact, but understand common Filipino quantity
+        // words and units before candidate review.
+        $text = strtr($text, ['isang' => '1', 'dalawang' => '2', 'dalawa' => '2', 'tatlong' => '3', 'tatlo' => '3']);
+        $lines = preg_split('/[\r\n,;]+|\s+(?:and|at)\s+/', $text) ?: [];
         $candidates = [];
         foreach ($lines as $line) {
             $line = trim(preg_replace('/\s+/', ' ', $line) ?? '');
             if ($line === '') continue;
-            preg_match('/^(?:(\d+(?:\.\d+)?)\s*(kg|g|grams?|ml|l|lit(?:er|re)?s?|pcs?|pieces?|cans?|packs?|bottles?)?\s*(?:of\s+)?)?(.+)$/i', $line, $matches);
+            // Receipts often end with a price. It is not an inventory amount.
+            $line = preg_replace('/(?:\s+|\s*@\s*)₱?\d+(?:\.\d{2})\s*$/u', '', $line) ?? $line;
+            if (preg_match('/^(?:₱?\d+(?:\.\d{2})?|\d+\s*x\s*₱?\d+(?:\.\d{2})?)$/iu', $line)) continue;
+            preg_match('/^(?:(\d+(?:\.\d+)?)\s*(kg|g|grams?|ml|l|lit(?:er|re)?s?|pcs?|pieces?|piraso|lata|cans?|packs?|pakete|bottles?|botelya)?\s*(?:of\s+)?)?(.+)$/i', $line, $matches);
             $name = trim($matches[3] ?? $line);
             // Ignore common receipt headings and totals without making assumptions about items.
             if (preg_match('/^(total|subtotal|change|cash|vat|date|receipt)\b/i', $name)) continue;
@@ -89,7 +95,7 @@ class PantryInputService
         $candidate = [
             'name' => Str::title(trim($name)),
             'quantity' => $amount[1] ?? null,
-            'unit' => trim($amount[2] ?? '') ?: null,
+            'unit' => $this->normaliseUnit(trim($amount[2] ?? '')),
             'purchase_source' => 'unknown',
             'storage_type' => 'unknown',
         ];
@@ -98,6 +104,30 @@ class PantryInputService
 
     private function groupCandidates(array $candidates): array
     {
+        // One spoken/printed item may appear twice (e.g. a receipt's English
+        // and Filipino description). Combine only same-review candidates with
+        // the same unit; incompatible units remain separate for the user.
+        $deduped = [];
+        foreach ($candidates as $candidate) {
+            $canonical = $candidate['ingredient']['canonical_name'] ?? $candidate['suggestion']['canonical_name'] ?? strtolower($candidate['name']);
+            $key = $candidate['status'].'|'.strtolower($canonical).'|'.strtolower((string) $candidate['unit']);
+            if (isset($deduped[$key]) && is_numeric($candidate['quantity']) && is_numeric($deduped[$key]['quantity'])) {
+                $deduped[$key]['quantity'] = (string) round((float) $deduped[$key]['quantity'] + (float) $candidate['quantity'], 3);
+            } else {
+                $deduped[$key] = $candidate;
+            }
+        }
+        $candidates = array_values($deduped);
         return ['accepted' => array_values(array_filter($candidates, fn ($item) => $item['status'] === 'accepted')), 'suggested' => array_values(array_filter($candidates, fn ($item) => $item['status'] === 'suggested')), 'rejected' => array_values(array_filter($candidates, fn ($item) => $item['status'] === 'rejected')), 'candidates' => array_values(array_filter($candidates, fn ($item) => $item['status'] !== 'rejected'))];
+    }
+
+    private function normaliseUnit(string $unit): ?string
+    {
+        return match (strtolower(trim($unit))) {
+            '' => null, 'gram', 'grams' => 'g', 'kilo', 'kilos', 'kilogram', 'kilograms' => 'kg',
+            'liter', 'liters', 'litre', 'litres' => 'l', 'piece', 'pieces', 'pc', 'pcs', 'piraso' => 'pieces',
+            'can', 'cans', 'lata' => 'cans', 'pack', 'packs', 'pakete' => 'packs', 'bottle', 'bottles', 'botelya' => 'bottles',
+            default => strtolower(trim($unit)),
+        };
     }
 }

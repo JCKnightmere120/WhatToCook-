@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { FormsModule } from '@angular/forms';
 import { IonicModule } from '@ionic/angular';
+import { RouterTestingModule } from '@angular/router/testing';
 
 import { ExploreContainerComponentModule } from '../explore-container/explore-container.module';
 
@@ -18,7 +19,7 @@ describe('RecipesPage', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       declarations: [RecipesPage],
-      imports: [IonicModule.forRoot(), ExploreContainerComponentModule, FormsModule, HttpClientTestingModule]
+      imports: [IonicModule.forRoot(), ExploreContainerComponentModule, FormsModule, HttpClientTestingModule, RouterTestingModule]
     }).compileComponents();
 
     fixture = TestBed.createComponent(RecipesPage);
@@ -32,17 +33,26 @@ describe('RecipesPage', () => {
 
   it('keeps a personal recipe scope local instead of selecting global personal context', () => {
     const family: Family = { id: 9, name: 'Santos', owner_id: 1 };
-    const api = jasmine.createSpyObj<ApiService>('ApiService', ['recommendations']);
-    api.recommendations.and.returnValue(of({ recommendations: [] }));
+    const api = jasmine.createSpyObj<ApiService>('ApiService', ['searchRecipes']);
+    api.searchRecipes.and.returnValue(of({ data: [], current_page: 1, last_page: 1, total: 0 }));
     Object.defineProperty(api, 'hasToken', { value: true });
     const context = jasmine.createSpyObj<HouseholdContextService>('HouseholdContextService', ['select']);
-    const page = new RecipesPage(api, context, { user: { id: 1 } } as AuthService);
+    const page = new RecipesPage(api, context, { user: { id: 1 } } as AuthService, jasmine.createSpyObj('Router', ['navigate']));
     page.families = [family];
     page.cookingScope = 'personal';
 
     page.changeCookingScope();
 
     expect(context.select).not.toHaveBeenCalled();
-    expect(api.recommendations).toHaveBeenCalledWith(undefined);
+    expect(api.searchRecipes).toHaveBeenCalledWith('', undefined, jasmine.objectContaining({ page: 1 }));
+  });
+
+  it('requests the next page when more recipes are available', () => {
+    const api = jasmine.createSpyObj<ApiService>('ApiService', ['searchRecipes']);
+    api.searchRecipes.and.returnValue(of({ data: [], current_page: 2, last_page: 3, total: 30 }));
+    const page = new RecipesPage(api, jasmine.createSpyObj('HouseholdContextService', ['refresh']), { user: { id: 1 } } as AuthService, jasmine.createSpyObj('Router', ['navigate']));
+    page.currentPage = 1; page.lastPage = 3;
+    page.loadMore();
+    expect(api.searchRecipes).toHaveBeenCalledWith('', undefined, jasmine.objectContaining({ page: 2 }));
   });
 });
