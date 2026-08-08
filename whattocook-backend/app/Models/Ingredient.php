@@ -17,4 +17,9 @@ class Ingredient extends Model
     {
         return $this->belongsTo(NutritionFood::class);
     }
+
+    public function recipe()
+    {
+        return $this->belongsTo(Recipe::class);
+    }
 }

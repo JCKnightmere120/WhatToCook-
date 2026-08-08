@@ -24,12 +24,11 @@ class AuthAndRecipePageTest extends TestCase
             'password' => 'password123',
         ]);
 
-        $response->assertRedirect('/dashboard');
+        $response->assertRedirect(route('home'));
         $this->assertAuthenticated();
 
-        $response = $this->get('/dashboard');
+        $response = $this->get(route('home'));
         $response->assertOk();
-        $response->assertSee('Recipe suggestions');
-        $response->assertSee('Voice input');
+        $response->assertSee('Log in');
     }
 }

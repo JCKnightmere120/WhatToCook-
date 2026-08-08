@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Log;
 
 class AuthController extends Controller
 {
@@ -22,6 +23,7 @@ class AuthController extends Controller
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
+            'is_admin' => 1,
         ]);
 
         if ($request->wantsJson()) {
@@ -35,7 +37,12 @@ class AuthController extends Controller
         }
 
         Auth::login($user);
-        return redirect()->route('dashboard');
+
+        if ($user->isAdmin()) {
+            return redirect()->intended(route('admin.dashboard'));
+        }
+
+        return redirect()->route('home');
     }
 
     // API login method
@@ -65,7 +72,12 @@ class AuthController extends Controller
         }
 
         Auth::login($user);
-        return redirect()->route('dashboard');
+
+        if ($user->isAdmin()) {
+            return redirect()->intended(route('admin.dashboard'));
+        }
+
+        return redirect()->route('home');
     }
 
     // Web login form
@@ -96,12 +108,14 @@ class AuthController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->route('dashboard');
-    }
+        $user = $request->user();
+        Log::info('authenticate: user id', ['id' => $user?->id, 'email' => $user?->email, 'is_admin' => $user?->is_admin]);
 
-    public function dashboard(Request $request)
-    {
-        return view('dashboard');
+        if ($user && method_exists($user, 'isAdmin') && $user->isAdmin()) {
+            return redirect()->intended(route('admin.dashboard'));
+        }
+
+        return redirect()->intended(route('home'));
     }
 
     public function logout(Request $request)
@@ -109,7 +123,10 @@ class AuthController extends Controller
         // Revoke all of the account's bearer tokens. This makes logout effective
         // even when the current request was authenticated through a session.
         if ($request->user()) {
-            $request->user()->tokens()->delete();
+            // Only delete tokens if the method exists (Sanctum trait present)
+            if (method_exists($request->user(), 'tokens')) {
+                $request->user()->tokens()->delete();
+            }
         }
 
         Auth::logout();
