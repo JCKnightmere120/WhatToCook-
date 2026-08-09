@@ -4,13 +4,9 @@
 
 export const environment = {
   production: false,
-  // Used by `ionic serve` in a desktop browser.
-  apiBaseUrl: 'http://127.0.0.1:8000/api',
-  // Android emulator: 10.0.2.2 points to the computer running Laravel.
-  // For a physical phone, replace this with your computer's LAN IP.
-  androidApiBaseUrl: 'http://10.0.2.2:8000/api'
+  apiBaseUrl: 'http://127.0.0.1:8001/api',
+  androidApiBaseUrl: 'http://10.0.2.2:8001/api'
 };
-
 /*
  * For easier debugging in development mode, you can import the following file
  * to ignore zone related error stack frames such as `zone.run`, `zoneDelegate.invokeTask`.
