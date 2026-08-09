@@ -9,11 +9,27 @@ cd whattocook-backend
 php artisan test
 
 cd ..\frontend
-npx ng build --configuration production
-npx ng test --watch=false --browsers=ChromeHeadless
+$env:WHATTOCOOK_API_BASE_URL = 'https://api.example.test'
+npm run lint
+npm run build
+npm run verify:android
+npm run test:ci
 ```
 
-Phase 6 result: backend 62 tests / 380 assertions; frontend 22 ChromeHeadless specs; production build passes.
+`WHATTOCOOK_API_BASE_URL` is deliberately a build-time setting. Use `https://api.example.test` only for CI/local artifact verification; use the actual HTTPS API hostname when preparing an installable release. It is an endpoint, not a secret, and it is not committed into source configuration.
+
+## Android release verification
+
+`npm run test:ci` uses an extension-free Chrome launcher so wallet/browser extensions cannot interfere with test results. `npm run verify:android` confirms Capacitor can synchronize the generated production web bundle into the Android project. It is not a substitute for a signed-device test.
+
+Before release, use a physical device and a signed release build:
+
+- [ ] Set `WHATTOCOOK_API_BASE_URL` to the final `https://...` API host and run `npm run build:android`.
+- [ ] Confirm the generated Android manifest resolves `usesCleartextTraffic=false` for release; debug remains enabled only for local emulator development.
+- [ ] Install the signed APK/AAB; register/sign in and confirm an authenticated pantry read succeeds.
+- [ ] Add, edit, and delete a test pantry item; confirm token-expiry/airplane-mode errors are handled without exposing technical details.
+- [ ] Confirm a browser request from every approved web origin succeeds, and a request from an unapproved origin has no CORS permission.
+- [ ] Check `https://<api-host>/up` returns healthy over TLS.
 
 ## Exact project-defense scenarios
 

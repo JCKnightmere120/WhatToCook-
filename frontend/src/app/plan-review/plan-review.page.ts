@@ -97,6 +97,18 @@ export class PlanReviewPage {
     return !!this.response?.conflicts.length;
   }
 
+  get personalConflicts() {
+    return this.response?.personal_conflicts || [];
+  }
+
+  get hasPersonalConflicts(): boolean {
+    return this.personalConflicts.length > 0;
+  }
+
+  personalConflictLabel(conflict: { diner_name: string; planned_date: string; meal_type: string }): string {
+    return `${conflict.diner_name} already has a personal ${this.mealTypeLabel(conflict.meal_type)} plan on ${this.dateLabel(conflict.planned_date)}.`;
+  }
+
   load(): void {
     if (!this.batchId) return;
     this.loading = true;
@@ -261,7 +273,7 @@ export class PlanReviewPage {
       next: result => {
         this.saving = false;
         this.applyResponse(result);
-        this.router.navigateByUrl('/tabs/meal-plan', { replaceUrl: true });
+        this.router.navigate(['/tabs/meal-plan'], { replaceUrl: true, queryParams: { refresh: Date.now() } });
       },
       error: error => {
         this.saving = false;

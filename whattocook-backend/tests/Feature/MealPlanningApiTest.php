@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\FamilyMember;
 use App\Models\HouseholdProfile;
+use App\Models\MealPlan;
 use App\Models\PantryItem;
 use App\Models\Recipe;
 use App\Models\User;
@@ -77,6 +78,19 @@ class MealPlanningApiTest extends TestCase
         $this->actingAs($user, 'sanctum')->postJson('/api/meal-plans', [
             'recipe_id' => $safe->id, 'planned_date' => '2026-08-03', 'meal_type' => 'dinner', 'servings' => 1,
         ])->assertCreated()->assertJsonPath('family_id', null);
+    }
+
+    public function test_a_family_meal_cannot_double_book_a_linked_diners_personal_meal(): void
+    {
+        [$owner, $member, $family] = $this->family();
+        $diner = HouseholdProfile::create(['family_id' => $family['id'], 'user_id' => $member->id, 'name' => $member->name]);
+        $recipe = $this->recipe($owner, 'Tinola');
+        MealPlan::create(['user_id' => $member->id, 'recipe_id' => $recipe->id, 'planned_date' => '2026-08-03', 'meal_type' => 'dinner', 'servings' => 1, 'status' => 'scheduled']);
+
+        $this->actingAs($owner, 'sanctum')->postJson('/api/meal-plans', [
+            'recipe_id' => $recipe->id, 'family_id' => $family['id'], 'planned_date' => '2026-08-03', 'meal_type' => 'dinner',
+            'servings' => 2, 'diner_profile_ids' => [$diner->id],
+        ])->assertUnprocessable()->assertJsonValidationErrors('personal_conflicts');
     }
 
     private function family(): array

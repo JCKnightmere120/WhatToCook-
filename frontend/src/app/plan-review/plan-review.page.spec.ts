@@ -99,7 +99,10 @@ describe('PlanReviewPage', () => {
     component.savePlan();
 
     expect(api.saveMealPlanBatch).toHaveBeenCalledWith(17, { conflict_action: 'replace_conflicting' });
-    expect(router.navigateByUrl).toHaveBeenCalledWith('/tabs/meal-plan', { replaceUrl: true });
+    expect(router.navigate).toHaveBeenCalledWith(['/tabs/meal-plan'], jasmine.objectContaining({
+      replaceUrl: true,
+      queryParams: jasmine.objectContaining({ refresh: jasmine.any(Number) }),
+    }));
   });
 
   it('adds shortages to the shopping list only once during a review', () => {

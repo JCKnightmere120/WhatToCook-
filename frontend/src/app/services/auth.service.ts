@@ -40,12 +40,18 @@ export class AuthService {
 
   logout(): void {
     const token = this.token;
+    // Clear local state before waiting for the network so sign-out is immediate
+    // and still succeeds from an offline device or an already-expired token.
+    this.clearSession();
     if (token) {
       this.http.post(`${this.baseUrl}/logout`, {}, { headers: new HttpHeaders({ Authorization: `Bearer ${token}` }) })
-        .subscribe({ complete: () => this.clearSession(), error: () => this.clearSession() });
-      return;
+        .subscribe({ error: () => undefined });
     }
-    this.clearSession();
+  }
+
+  /** Ends a stale session after a protected API request returns 401. */
+  handleUnauthorized(): void {
+    if (this.isAuthenticated) this.clearSession();
   }
 
   private clearSession(): void {

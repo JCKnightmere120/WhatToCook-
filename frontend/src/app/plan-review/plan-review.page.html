@@ -43,6 +43,16 @@
         </ion-card-content>
       </ion-card>
 
+      <ion-card *ngIf="hasPersonalConflicts && isDraft" color="warning">
+        <ion-card-header>
+          <ion-card-title>Some diners already have a personal meal</ion-card-title>
+        </ion-card-header>
+        <ion-card-content>
+          <p *ngFor="let conflict of personalConflicts">{{ personalConflictLabel(conflict) }}</p>
+          <p>Change the meal, date, meal time, or diners before saving. Personal meal details stay private and cannot be replaced from this household plan.</p>
+        </ion-card-content>
+      </ion-card>
+
       <section aria-labelledby="draft-meals-heading">
         <h2 id="draft-meals-heading">Draft meals</h2>
         <ion-list inset="true">
@@ -91,7 +101,7 @@
           I already bought these
         </ion-button>
         <ion-note color="medium" class="action-help">“I already bought these” adds the items to the appropriate pantry and recalculates this draft. You can also save now and buy missing items later.</ion-note>
-        <ion-button expand="block" (click)="savePlan()" [disabled]="saving">
+        <ion-button expand="block" (click)="savePlan()" [disabled]="saving || hasPersonalConflicts">
           {{ saving ? 'Saving plan…' : 'Save meal plan' }}
         </ion-button>
         <ion-button expand="block" fill="clear" color="danger" (click)="discardPlan()" [disabled]="saving">Discard draft</ion-button>

@@ -33,6 +33,17 @@ module.exports = function (config) {
       ]
     },
     reporters: ['progress', 'kjhtml'],
+    customLaunchers: {
+      ChromeHeadlessNoExtensions: {
+        base: 'ChromeHeadless',
+        flags: [
+          '--disable-extensions',
+          '--disable-component-extensions-with-background-pages',
+          '--disable-background-networking',
+          '--no-first-run',
+        ],
+      },
+    },
     port: 9876,
     colors: true,
     logLevel: config.LOG_INFO,

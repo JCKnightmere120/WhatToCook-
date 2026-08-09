@@ -89,4 +89,5 @@ Route::middleware(['throttle:api', 'auth:sanctum'])->group(function () {
     Route::get('/meal-plans/{mealPlan}', [MealPlanController::class, 'show']);
     Route::apiResource('meal-history', MealHistoryController::class)->except(['show']);
     Route::apiResource('shopping-list', ShoppingListController::class)->except(['show']);
+    Route::post('/shopping-list/{shoppingList}/confirm-purchase', [ShoppingListController::class, 'confirmPurchase']);
 });

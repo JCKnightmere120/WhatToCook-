@@ -1,5 +1,5 @@
 import { Component } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { forkJoin, of } from 'rxjs';
 import { catchError, switchMap } from 'rxjs/operators';
 import { ApiService, Family, HouseholdProfile, MealPlan, Recommendation } from '../services/api.service';
@@ -32,7 +32,13 @@ export class MealPlanPage {
   message = '';
   private periodStart = this.startOfWeek(new Date());
 
-  constructor(private api: ApiService, private householdContext: HouseholdContextService, private auth: AuthService, private router: Router) {}
+  constructor(private api: ApiService, private householdContext: HouseholdContextService, private auth: AuthService, private router: Router, private route: ActivatedRoute) {
+    // A saved generated draft returns here with this value. Query parameters
+    // update even when Ionic keeps the tab page alive in its navigation stack.
+    this.route.queryParamMap.subscribe(params => {
+      if (params.has('refresh')) this.load();
+    });
+  }
   ionViewWillEnter(): void { this.load(); }
 
   load(): void {

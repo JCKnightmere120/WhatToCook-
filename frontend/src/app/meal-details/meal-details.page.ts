@@ -139,6 +139,10 @@ export class MealDetailsPage {
     this.router.navigateByUrl('/tabs/meal-plan');
   }
 
+  startCooking(): void {
+    if (this.plan && !this.isCompleted) this.router.navigate(['/cooking', this.plan.id]);
+  }
+
   openSwap(): void {
     if (!this.plan || this.isCompleted) return;
     this.showSwap = true;

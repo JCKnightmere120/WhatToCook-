@@ -268,16 +268,61 @@ class RecipeSeeder extends Seeder
                     ['name' => 'garlic', 'quantity' => '5', 'unit' => 'cloves'],
                 ],
             ],
+            [
+                'name' => 'Chicken Inasal',
+                'description' => 'Bacolod-style grilled chicken marinated with calamansi, lemongrass, and annatto.',
+                'instructions' => "1. Combine chicken, calamansi juice, lemongrass, garlic, ginger, and salt. Marinate for at least 30 minutes.\n2. Mix annatto powder with oil for basting.\n3. Grill chicken over medium heat, turning and basting until cooked through.\n4. Serve with rice and calamansi.",
+                'cooking_tips' => 'Keep the grill at medium heat so the annatto basting does not burn before the chicken cooks through.',
+                'region' => 'Visayas',
+                'prep_time' => 15,
+                'cook_time' => 30,
+                'servings' => 4,
+                'meal_type' => 'dinner',
+                'difficulty' => 'medium',
+                'calories' => 330, 'protein' => 31, 'carbs' => 5, 'fat' => 20,
+                'ingredients' => [
+                    ['name' => 'chicken', 'quantity' => '1', 'unit' => 'kg'],
+                    ['name' => 'calamansi', 'quantity' => '8', 'unit' => 'pcs'],
+                    ['name' => 'lemongrass', 'quantity' => '2', 'unit' => 'stalks'],
+                    ['name' => 'annatto powder', 'quantity' => '1', 'unit' => 'tbsp'],
+                    ['name' => 'garlic', 'quantity' => '4', 'unit' => 'cloves'],
+                    ['name' => 'ginger', 'quantity' => '1', 'unit' => 'thumb'],
+                ],
+            ],
+            [
+                'name' => 'Kinilaw na Isda',
+                'description' => 'A bright Mindanao-style fish kinilaw cured with vinegar, calamansi, ginger, and chilies.',
+                'instructions' => "1. Use very fresh fish and keep it chilled.\n2. Toss fish with vinegar for 5 minutes, then drain excess vinegar.\n3. Add calamansi juice, ginger, onion, cucumber, and chilies.\n4. Season with salt and serve immediately.",
+                'cooking_tips' => 'Use sashimi-grade fish from a trusted source; acid changes texture but is not a substitute for safe handling.',
+                'region' => 'Mindanao',
+                'prep_time' => 20,
+                'cook_time' => 0,
+                'servings' => 4,
+                'meal_type' => 'lunch',
+                'difficulty' => 'medium',
+                'calories' => 180, 'protein' => 25, 'carbs' => 6, 'fat' => 5,
+                'ingredients' => [
+                    ['name' => 'fresh fish', 'quantity' => '500', 'unit' => 'g'],
+                    ['name' => 'cane vinegar', 'quantity' => '1/3', 'unit' => 'cup'],
+                    ['name' => 'calamansi', 'quantity' => '6', 'unit' => 'pcs'],
+                    ['name' => 'ginger', 'quantity' => '1', 'unit' => 'thumb'],
+                    ['name' => 'red onion', 'quantity' => '1', 'unit' => 'pc'],
+                    ['name' => 'cucumber', 'quantity' => '1', 'unit' => 'pc'],
+                    ['name' => 'siling labuyo', 'quantity' => '2', 'unit' => 'pcs'],
+                ],
+            ],
         ];
 
         foreach ($recipes as $recipe) {
             $ingredients = $recipe['ingredients'];
             unset($recipe['ingredients']);
 
-            $model = Recipe::firstOrCreate(['name' => $recipe['name']], $recipe);
-            if ($model->wasRecentlyCreated) {
-                $model->ingredients()->createMany($ingredients);
-            }
+            // This is intentionally an upsert, rather than firstOrCreate: the
+            // array above is the reviewed catalogue and seeding must also apply
+            // editorial corrections to an existing local database.
+            $model = Recipe::updateOrCreate(['name' => $recipe['name']], $recipe);
+            $model->ingredients()->delete();
+            $model->ingredients()->createMany($ingredients);
         }
     }
 }

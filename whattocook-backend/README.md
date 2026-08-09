@@ -1,58 +1,36 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# WhatToCook API
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+The WhatToCook API is built with Laravel 13, PHP 8.3+, SQLite, and Laravel Sanctum.
 
-## About Laravel
+## Setup
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
-
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
-
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
-
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
-
-```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+```powershell
+composer setup
+php artisan serve
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+`composer setup` installs PHP and frontend dependencies, copies `.env.example` to `.env` when necessary, generates an application key, runs migrations, and builds Laravel's Vite assets. The default SQLite database is `database/database.sqlite`; it is created by the Laravel project setup workflow and is intentionally ignored by Git.
 
-## Contributing
+If you set up manually, ensure `.env` contains `DB_CONNECTION=sqlite` and that `database/database.sqlite` exists before running `php artisan migrate`.
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## Tests
 
-## Code of Conduct
+```powershell
+php artisan test
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+The test suite uses an in-memory SQLite database, so it does not modify your local development database.
 
-## Security Vulnerabilities
+## Production configuration
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+Use a managed MySQL or PostgreSQL database for the shared API; SQLite is only the local default. Set production values in the hosting provider's secret/configuration store, never in Git: `APP_KEY`, `APP_ENV=production`, `APP_DEBUG=false`, `APP_URL` (HTTPS), `APP_FORCE_HTTPS=true`, `DB_*`, `USDA_API_KEY`, and `CORS_ALLOWED_ORIGINS`.
 
-## License
+`CORS_ALLOWED_ORIGINS` is a comma-separated list of approved web client HTTPS origins. Capacitor's local native origins are included separately so a signed Android app can call the same HTTPS API. The API uses bearer tokens, so cross-site cookies are disabled. See the root [deployment guide](../DEPLOYMENT_GUIDE.md) for migration, health-check, backup, and rollback steps.
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## API authentication
+
+The mobile client registers or signs in at `/api/register` and `/api/login`, then sends the returned Sanctum token as a Bearer token. Protected endpoints return JSON `401` responses for expired or invalid tokens. `/api/logout` revokes the account's bearer tokens.
+
+## USDA nutrition data
+
+Set `USDA_API_KEY` in `.env` to enable FoodData Central search and caching. The key remains server-side; do not put it in the mobile app. If it is absent, USDA endpoints return `503` and clients must show nutrition as unavailable. Recipe nutrition returns `data_status` (`complete`, `partial`, or `incomplete`) and `unknown_nutrients`; totals are estimates, not medical advice, and missing values are never silently treated as zero.

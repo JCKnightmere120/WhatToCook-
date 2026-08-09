@@ -22,11 +22,10 @@ Frontend
 - Android Studio integration for Android build and testing
 
 Backend
-- Laravel 12
+- Laravel 13
 - REST API
 - Laravel Sanctum authentication
-- MySQL database
-- SQLite only for optional local cache/offline mobile storage
+- SQLite database for local development and automated tests
 - Recipe recommendation module
 - Pantry inventory management
 - Nutrition data module
@@ -242,7 +241,7 @@ Frontend
 Backend
 - PHP Laravel for API and business logic
 - Laravel Sanctum for authentication
-- MySQL for database
+- SQLite for database
 
 Important note:
 This document may still be updated as the capstone scope becomes clearer. The system should be designed to be scalable, but the team should still build it in phases so the main features are completed first.
