@@ -264,7 +264,7 @@ class PantryApiTest extends TestCase
             ->assertJsonPath('missing_ingredients.0.substitutes.0', 'tamari');
 
         $this->actingAs($user, 'sanctum')->postJson("/api/recipes/{$recipe['id']}/shopping-list")
-            ->assertCreated()->assertJsonPath('items.0.quantity', 0.5);
+            ->assertCreated()->assertJsonPath('items.0.quantity', '0.5');
     }
 
     public function test_recipe_matching_marks_recognised_stock_with_incompatible_units_for_review(): void
@@ -314,7 +314,7 @@ class PantryApiTest extends TestCase
         ])->json();
 
         $this->actingAs($owner, 'sanctum')->postJson("/api/recipes/{$recipe['id']}/shopping-list", ['family_id' => $family['id']])
-            ->assertCreated()->assertJsonPath('items.0.quantity', 1);
+            ->assertCreated()->assertJsonPath('items.0.quantity', '1');
         $this->actingAs($member, 'sanctum')->getJson('/api/shopping-list')
             ->assertOk()->assertJsonPath('0.ingredient_name', 'Rice');
     }
