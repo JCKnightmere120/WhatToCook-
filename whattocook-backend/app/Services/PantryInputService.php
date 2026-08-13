@@ -27,7 +27,7 @@ class PantryInputService
             'barcode' => $barcode,
             'needs_review' => true,
             'message' => $name ? 'Product found. Please confirm its pantry details.' : 'Product was not found. Enter its name and confirm the details.',
-            ...$this->groupCandidates([$this->candidate($name, $product['quantity'] ?? null)]),
+            ...$this->groupCandidates($name !== '' ? [$this->candidate($name, $product['quantity'] ?? null)] : []),
         ];
     }
 
@@ -41,20 +41,19 @@ class PantryInputService
         return [
             'source' => $source,
             'needs_review' => true,
-            'message' => 'Voice input was converted into editable pantry details. Please verify it before saving.',
+            'message' => $source === 'receipt'
+                ? 'Receipt text was converted into editable pantry candidates. Verify each item before saving.'
+                : 'Voice input was converted into editable pantry details. Please verify it before saving.',
             ...$this->groupCandidates($this->parseText($text)),
         ];
     }
 
     public function fromReceipt(UploadedFile $receipt, ?string $recognizedText): array
     {
-        // Keep the original only long enough for an optional OCR provider/queued job to process it.
-        $path = $receipt->store('receipt-inputs', 'local');
         $text = trim((string) $recognizedText);
 
         return [
             'source' => 'receipt',
-            'receipt_reference' => basename($path),
             'needs_review' => true,
             'message' => $text !== ''
                 ? 'Receipt text was converted into editable candidates. Verify each item before saving.'
@@ -72,7 +71,22 @@ class PantryInputService
         // Keep receipt lines intact, but understand common Filipino quantity
         // words and units before candidate review.
         $text = strtr($text, ['isang' => '1', 'dalawang' => '2', 'dalawa' => '2', 'tatlong' => '3', 'tatlo' => '3']);
-        $lines = preg_split('/[\r\n,;]+|\s+(?:and|at)\s+/', $text) ?: [];
+        $rawLines = preg_split('/[\r\n,;]+|\s+(?:and|at)\s+/', $text) ?: [];
+        // Speech recognition often omits punctuation and the word "and".
+        // A new numeric quantity is therefore also a reliable boundary:
+        // "2 eggs 2 onions 2 boxes of milk" becomes three candidates.
+        $lines = [];
+        $unitPattern = 'kg|g|grams?|ml|l|lit(?:er|re)?s?|pcs?|pieces?|piraso|lata|cans?|packs?|pakete|bottles?|botelya|boxes?|kahons?';
+        foreach ($rawLines as $rawLine) {
+            $rawLine = trim($rawLine);
+            if (preg_match_all('/(?:^|\s)(\d+(?:\.\d+)?)\s*(?:('.$unitPattern.')\s*)?(?:of\s+)?(.+?)(?=\s+\d+(?:\.\d+)?\s*(?:'.$unitPattern.')?\s*(?:of\s+)?|$)/i', $rawLine, $found, PREG_SET_ORDER)) {
+                foreach ($found as $part) {
+                    $lines[] = trim($part[1].' '.($part[2] ?? '').' '.($part[3] ?? ''));
+                }
+            } else {
+                $lines[] = $rawLine;
+            }
+        }
         $candidates = [];
         foreach ($lines as $line) {
             $line = trim(preg_replace('/\s+/', ' ', $line) ?? '');
@@ -80,7 +94,7 @@ class PantryInputService
             // Receipts often end with a price. It is not an inventory amount.
             $line = preg_replace('/(?:\s+|\s*@\s*)₱?\d+(?:\.\d{2})\s*$/u', '', $line) ?? $line;
             if (preg_match('/^(?:₱?\d+(?:\.\d{2})?|\d+\s*x\s*₱?\d+(?:\.\d{2})?)$/iu', $line)) continue;
-            preg_match('/^(?:(\d+(?:\.\d+)?)\s*(kg|g|grams?|ml|l|lit(?:er|re)?s?|pcs?|pieces?|piraso|lata|cans?|packs?|pakete|bottles?|botelya)?\s*(?:of\s+)?)?(.+)$/i', $line, $matches);
+            preg_match('/^(?:(\d+(?:\.\d+)?)\s*('.$unitPattern.')?\s*(?:of\s+)?)?(.+)$/i', $line, $matches);
             $name = trim($matches[3] ?? $line);
             // Ignore common receipt headings and totals without making assumptions about items.
             if (preg_match('/^(total|subtotal|change|cash|vat|date|receipt)\b/i', $name)) continue;
@@ -127,6 +141,7 @@ class PantryInputService
             '' => null, 'gram', 'grams' => 'g', 'kilo', 'kilos', 'kilogram', 'kilograms' => 'kg',
             'liter', 'liters', 'litre', 'litres' => 'l', 'piece', 'pieces', 'pc', 'pcs', 'piraso' => 'pieces',
             'can', 'cans', 'lata' => 'cans', 'pack', 'packs', 'pakete' => 'packs', 'bottle', 'bottles', 'botelya' => 'bottles',
+            'box', 'boxes', 'kahon', 'kahons' => 'boxes',
             default => strtolower(trim($unit)),
         };
     }

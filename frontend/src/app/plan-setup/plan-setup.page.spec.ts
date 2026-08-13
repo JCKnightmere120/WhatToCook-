@@ -130,4 +130,16 @@ describe('PlanSetupPage', () => {
     expect(component.conflictMessage).toContain('already use the selected slot');
     expect(api.generateMealPlanBatch).not.toHaveBeenCalled();
   });
+
+  it('sets a weekly end date and keeps cuisine and equipment choices interactive', () => {
+    component.startDate = '2099-08-03';
+
+    component.setPlanLength(2);
+    component.toggleCuisine('Asian');
+    component.toggleEquipment('oven');
+
+    expect(component.endDate).toBe('2099-08-16');
+    expect(component.hasCuisine('Asian')).toBeTrue();
+    expect(component.hasEquipment('oven')).toBeTrue();
+  });
 });

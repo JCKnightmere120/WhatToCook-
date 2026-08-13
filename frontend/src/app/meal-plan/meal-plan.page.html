@@ -1,26 +1,29 @@
-<ion-header>
-  <ion-toolbar>
-    <ion-title>Meal planner</ion-title>
-    <ion-buttons slot="end">
-      <ion-button (click)="load()" aria-label="Refresh planner"><ion-icon name="refresh-outline"></ion-icon></ion-button>
-    </ion-buttons>
-  </ion-toolbar>
-</ion-header>
-
 <ion-content>
-  <main class="page">
-    <p class="message" *ngIf="message">{{ message }}</p>
-    <ion-spinner *ngIf="loading" class="spinner"></ion-spinner>
+  <main class="page wtc-tab-page wtc-page--wide">
+    <p class="message" *ngIf="message" role="status">{{ message }}</p>
+    <section *ngIf="loading" class="wtc-state wtc-state--loading" role="status" aria-live="polite">
+      <ion-spinner aria-label="Loading your meal plan"></ion-spinner>
+      <h2>Loading your meal plan</h2>
+      <p>Getting your meals, diners, and recipe options ready.</p>
+    </section>
 
-    <ng-container *ngIf="!loading">
+    <section *ngIf="!loading && loadError" class="wtc-state wtc-state--error" role="alert">
+      <ion-icon class="wtc-state__icon" name="alert-circle-outline" aria-hidden="true"></ion-icon>
+      <h2>We couldn't load your plan</h2>
+      <p>{{ loadError }}</p>
+      <ion-button fill="outline" (click)="load()">Try again</ion-button>
+    </section>
+
+    <ng-container *ngIf="!loading && !loadError">
       <section class="planner-heading">
-        <p class="intro">Choose a personal plan or the shared household you want to manage.</p>
+        <div class="planner-heading__copy"><p class="eyebrow">MEAL PLANNING</p><h1>Weekly plan</h1><p class="intro">See what is coming up, what your pantry can cover, and what to add to your grocery list.</p></div>
         <ion-item lines="none" class="context-picker">
           <ion-icon name="people-outline" slot="start"></ion-icon>
           <ion-select label="Planning for" [(ngModel)]="contextId" (ionChange)="changeContext()">
             <ion-select-option value="personal">My personal plan</ion-select-option>
             <ion-select-option *ngFor="let family of families" [value]="family.id">{{ family.name }}</ion-select-option>
           </ion-select>
+          <ion-button slot="end" fill="clear" size="small" (click)="load()" aria-label="Refresh planner" title="Refresh planner"><ion-icon name="refresh-outline"></ion-icon></ion-button>
         </ion-item>
       </section>
 
@@ -40,6 +43,11 @@
         <ion-button fill="clear" (click)="nextPeriod()" aria-label="Next period"><ion-icon name="chevron-forward-outline"></ion-icon></ion-button>
       </div>
 
+      <section class="week-actions" aria-label="Weekly plan actions">
+        <p><ion-icon name="leaf-outline" aria-hidden="true"></ion-icon> Pantry readiness updates from each meal's ingredient check.</p>
+        <ion-button fill="outline" size="small" (click)="openShoppingList()"><ion-icon slot="start" name="cart-outline"></ion-icon>Grocery list</ion-button>
+      </section>
+
       <p class="notice" *ngIf="household && !diners.length">Add diner profiles in Family before scheduling shared meals.</p>
 
       <section class="week" aria-label="Meal schedule">
@@ -51,6 +59,7 @@
               <button type="button" class="planned" (click)="openSlot(day, type, plan)">
                 <strong>{{ recipeName(plan) }}</strong>
                 <small>{{ servingsFor(plan) }} servings · {{ dinersFor(plan) }}</small>
+                <span class="readiness" [class]="'readiness readiness--' + readiness(plan)"><ion-icon [name]="readiness(plan) === 'ready' ? 'checkmark-circle' : readiness(plan) === 'attention' ? 'cart-outline' : readiness(plan) === 'cooked' ? 'checkmark-done-outline' : 'help-circle-outline'"></ion-icon>{{ readinessLabel(plan) }}</span>
               </button>
               <ion-button size="small" fill="clear" (click)="openMealDetails(plan)">
                 {{ isCooked(plan) ? 'View meal details' : 'Check ingredients & cook' }}
@@ -72,7 +81,7 @@
   </main>
 </ion-content>
 
-<ion-footer class="planner-footer" *ngIf="!loading">
+<ion-footer class="planner-footer" *ngIf="!loading && !loadError">
   <ion-toolbar>
     <ion-button expand="block" (click)="openGeneration()">
       <ion-icon slot="start" name="sparkles-outline"></ion-icon>

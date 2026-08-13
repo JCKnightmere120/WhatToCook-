@@ -1,53 +1,74 @@
 <ion-header>
-  <ion-toolbar>
+  <ion-toolbar class="cooking-toolbar">
     <ion-buttons slot="start"><ion-back-button [defaultHref]="'/meal-details/' + mealPlanId"></ion-back-button></ion-buttons>
-    <ion-title>Cooking mode</ion-title>
+    <ion-title>Guided cooking</ion-title>
   </ion-toolbar>
 </ion-header>
 
 <ion-content>
-  <main class="page">
-    <ion-spinner *ngIf="loading" class="loading" aria-label="Loading cooking mode"></ion-spinner>
-    <ion-text color="danger" *ngIf="message"><p class="message">{{ message }}</p></ion-text>
+  <main class="page cooking-page">
+    <div *ngIf="loading" class="wtc-state wtc-state--loading"><ion-spinner aria-label="Loading cooking mode"></ion-spinner><p>Getting your cooking session ready...</p></div>
+    <div *ngIf="message" class="wtc-state wtc-state--error wtc-state--compact"><ion-icon name="alert-circle-outline" class="wtc-state__icon" aria-hidden="true"></ion-icon><p>{{ message }}</p></div>
 
     <ng-container *ngIf="!loading && preflight">
-      <ion-card>
-        <ion-card-header><ion-card-subtitle>{{ progressLabel }}</ion-card-subtitle><ion-card-title>{{ preflight.recipe.name }}</ion-card-title></ion-card-header>
-        <ion-card-content>
-          <ion-progress-bar [value]="progressValue" aria-label="Cooking progress"></ion-progress-bar>
-          <p class="step" *ngIf="currentStep">{{ currentStep }}</p>
-          <ion-note color="medium" *ngIf="!steps.length">This recipe has no usable instruction steps yet.</ion-note>
-        </ion-card-content>
-      </ion-card>
-
-      <section class="navigation" *ngIf="steps.length" aria-label="Instruction navigation">
-        <ion-button fill="outline" (click)="previous()" [disabled]="stepIndex === 0 || finishing">Back</ion-button>
-        <ion-button (click)="next()" [disabled]="isLastStep || finishing">Next</ion-button>
+      <section class="session-header" aria-label="Recipe and cooking progress">
+        <p class="wtc-eyebrow">Now cooking</p>
+        <h1>{{ preflight.recipe.name }}</h1>
+        <div class="recipe-meta" *ngIf="totalTime || preflight.recipe.servings">
+          <span *ngIf="totalTime"><ion-icon name="time-outline" aria-hidden="true"></ion-icon>{{ totalTime }} min</span>
+          <span *ngIf="preflight.recipe.servings"><ion-icon name="people-outline" aria-hidden="true"></ion-icon>{{ preflight.recipe.servings }} servings</span>
+        </div>
+        <div class="progress-heading"><span>{{ progressLabel }}</span><span>{{ progressValue * 100 | number:'1.0-0' }}%</span></div>
+        <ion-progress-bar [value]="progressValue" aria-label="Cooking progress"></ion-progress-bar>
       </section>
 
-      <section aria-labelledby="ingredients-heading">
-        <h2 id="ingredients-heading">Ingredients</h2>
-        <ion-list inset="true">
-          <ion-item *ngFor="let ingredient of preflight.recipe.ingredients"><ion-label>{{ ingredientLabel(ingredient) }}</ion-label></ion-item>
+      <article class="step-card" *ngIf="steps.length; else noSteps">
+        <span class="step-card__number" aria-hidden="true">{{ stepIndex + 1 }}</span>
+        <p class="step-card__eyebrow">Instruction {{ stepIndex + 1 }}</p>
+        <p class="step-card__instruction">{{ currentStep }}</p>
+      </article>
+      <ng-template #noSteps><section class="wtc-state wtc-state--empty"><ion-icon name="list-outline" class="wtc-state__icon" aria-hidden="true"></ion-icon><h2>No steps yet</h2><p>This recipe has no usable instruction steps yet.</p></section></ng-template>
+
+      <section class="timer-card" aria-labelledby="timer-heading">
+        <div class="section-title"><div><p class="wtc-eyebrow">Stay on track</p><h2 id="timer-heading">Kitchen timer</h2></div><ion-icon name="timer-outline" aria-hidden="true"></ion-icon></div>
+        <div class="timer-display" [class.timer-display--running]="timerRunning" aria-live="polite">{{ timerLabel }}</div>
+        <div class="timer-controls"><ion-input type="number" min="1" max="180" label="Minutes" labelPlacement="stacked" [(ngModel)]="timerMinutes" [disabled]="timerRunning"></ion-input><ion-button (click)="startTimer()" [disabled]="timerRunning"><ion-icon slot="start" name="play"></ion-icon>Start</ion-button><ion-button fill="outline" (click)="pauseTimer()" [disabled]="!timerRunning"><ion-icon slot="start" name="pause"></ion-icon>Pause</ion-button><ion-button fill="clear" (click)="resetTimer()">Reset</ion-button></div>
+      </section>
+
+      <aside *ngIf="preflight.recipe.cooking_tips" class="cooking-tip">
+        <ion-icon name="bulb-outline" aria-hidden="true"></ion-icon><div><p class="wtc-eyebrow">Cook's tip</p><p>{{ preflight.recipe.cooking_tips }}</p></div>
+      </aside>
+
+      <section class="ingredients-card" aria-labelledby="ingredients-heading">
+        <div class="section-title"><div><p class="wtc-eyebrow">Before you finish</p><h2 id="ingredients-heading">Ingredient checklist</h2></div><span>{{ checkedIngredientCount }}/{{ preflight.recipe.ingredients.length }}</span></div>
+        <ion-list lines="none">
+          <ion-item *ngFor="let ingredient of preflight.recipe.ingredients; let index = index" [class.ingredient--checked]="ingredientChecks[index]">
+            <ion-checkbox slot="start" [checked]="ingredientChecks[index]" (ionChange)="toggleIngredient(index, $event.detail.checked)" [aria-label]="'Check ' + ingredientLabel(ingredient)"></ion-checkbox>
+            <ion-label>{{ ingredientLabel(ingredient) }}</ion-label>
+          </ion-item>
         </ion-list>
       </section>
 
-      <section class="timer" aria-labelledby="timer-heading">
-        <h2 id="timer-heading">Optional timer</h2>
-        <ion-note color="medium">This timer stays on this screen; it does not send a notification.</ion-note>
-        <div class="timer-controls"><ion-input type="number" min="1" max="180" label="Minutes" labelPlacement="stacked" [(ngModel)]="timerMinutes" [disabled]="timerRunning"></ion-input><strong>{{ timerLabel }}</strong><ion-button size="small" (click)="startTimer()" [disabled]="timerRunning">Start</ion-button><ion-button size="small" fill="outline" (click)="pauseTimer()" [disabled]="!timerRunning">Pause</ion-button><ion-button size="small" fill="clear" (click)="resetTimer()">Reset</ion-button></div>
-      </section>
-
       <section class="finish" aria-label="Finish cooking">
-        <h2>Finish cooking</h2>
+        <p class="wtc-eyebrow">All done?</p><h2>Finish cooking</h2>
         <ion-textarea label="Cooking notes (optional)" labelPlacement="stacked" [(ngModel)]="completionNotes" maxlength="5000" placeholder="What worked, substitutions, or changes for next time"></ion-textarea>
-        <ion-button expand="block" (click)="requestFinishWithPantryDeduction()" [disabled]="!preflight.can_cook_from_pantry || finishing">{{ finishing ? 'Finishing…' : 'Cook & deduct pantry' }}</ion-button>
+        <ion-button expand="block" (click)="requestFinishWithPantryDeduction()" [disabled]="!preflight.can_cook_from_pantry || finishing">{{ finishing ? 'Finishing...' : 'Cook & deduct pantry' }}</ion-button>
         <ion-note color="medium" *ngIf="!preflight.can_cook_from_pantry">Pantry deduction is unavailable until the ingredient check is ready.</ion-note>
         <ion-button expand="block" fill="outline" (click)="requestFinishWithoutPantryDeduction()" [disabled]="finishing">Mark cooked without pantry update</ion-button>
       </section>
     </ng-container>
   </main>
 </ion-content>
+
+<ion-footer *ngIf="!loading && preflight && steps.length" class="cooking-navigation">
+  <ion-toolbar>
+    <div class="cooking-navigation__controls" aria-label="Instruction navigation">
+      <ion-button fill="clear" (click)="previous()" [disabled]="stepIndex === 0 || finishing"><ion-icon slot="start" name="arrow-back"></ion-icon>Back</ion-button>
+      <span>{{ progressLabel }}</span>
+      <ion-button (click)="next()" [disabled]="isLastStep || finishing">Next<ion-icon slot="end" name="arrow-forward"></ion-icon></ion-button>
+    </div>
+  </ion-toolbar>
+</ion-footer>
 
 <ion-alert [isOpen]="confirmingCook" header="Cook this meal?" message="The checked pantry quantities will be deducted and the meal will be added to your cooking history." [buttons]="cookAlertButtons" (didDismiss)="confirmingCook = false"></ion-alert>
 <ion-alert [isOpen]="confirmingWithoutDeduction" header="Mark as cooked without pantry update?" message="The meal will appear in cooking history without changing pantry stock." [buttons]="withoutDeductionAlertButtons" (didDismiss)="confirmingWithoutDeduction = false"></ion-alert>

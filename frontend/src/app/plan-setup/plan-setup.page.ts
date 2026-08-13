@@ -8,6 +8,7 @@ type MealType = 'breakfast' | 'lunch' | 'dinner';
 type AttendanceMode = 'every_day' | 'weekdays' | 'weekends' | 'specific_days';
 type PlanContext = 'personal' | number;
 type ChildMealMode = 'family_meal_with_adaptation' | 'separate_child_meal' | 'exclude';
+type PlanLength = 1 | 2 | 3 | 4;
 
 interface AttendanceEditor {
   diner: HouseholdProfile;
@@ -23,6 +24,7 @@ interface AttendanceEditor {
   standalone: false,
 })
 export class PlanSetupPage {
+  readonly planLengths: PlanLength[] = [1, 2, 3, 4];
   readonly mealTypes: Array<{ value: MealType; label: string }> = [
     { value: 'breakfast', label: 'Breakfast' },
     { value: 'lunch', label: 'Lunch' },
@@ -34,14 +36,25 @@ export class PlanSetupPage {
     { value: 'weekends', label: 'Weekends only' },
     { value: 'specific_days', label: 'Specific days' },
   ];
+  readonly cuisineOptions = ['Filipino', 'Asian', 'Mediterranean', 'Western'];
+  readonly equipmentOptions = [
+    { value: 'stovetop', label: 'Stovetop', icon: 'flame-outline' },
+    { value: 'oven', label: 'Oven', icon: 'pizza-outline' },
+    { value: 'air-fryer', label: 'Air fryer', icon: 'restaurant-outline' },
+    { value: 'rice-cooker', label: 'Rice cooker', icon: 'cafe-outline' },
+  ];
 
   readonly minimumDate = this.toDateOnly(new Date());
   startDate = this.minimumDate;
   endDate = this.toDateOnly(this.addDays(new Date(), 6));
+  planLength: PlanLength = 1;
   mealTypesSelected: MealType[] = ['dinner'];
   cookingTimeBudget: '15' | '30' | '45' | '60' | '90+' = '60';
   timePreference: 'strict' | 'flexible' = 'flexible';
   leftoverStrategy: 'avoid_leftovers' | 'reuse_ulam' | 'main_with_rice_side' = 'avoid_leftovers';
+  cuisinePreferences: string[] = ['Filipino'];
+  dietPreference = 'saved-profile';
+  availableEquipment: string[] = ['stovetop'];
   servings = 1;
   contextId: PlanContext = 'personal';
   families: Family[] = [];
@@ -54,6 +67,7 @@ export class PlanSetupPage {
   attendanceEditor?: AttendanceEditor;
   loading = false;
   generating = false;
+  generationStep = 0;
   message = '';
   conflictMessage = '';
   showConflictChoice = false;
@@ -88,6 +102,22 @@ export class PlanSetupPage {
       ? this.mealTypesSelected.filter(item => item !== type)
       : [...this.mealTypesSelected, type];
   }
+
+  setPlanLength(length: PlanLength): void {
+    this.planLength = length;
+    const start = this.dateFromInput(this.startDate) || new Date();
+    this.endDate = this.toDateOnly(this.addDays(start, (length * 7) - 1));
+  }
+
+  toggleCuisine(cuisine: string): void {
+    this.cuisinePreferences = this.cuisinePreferences.includes(cuisine) ? this.cuisinePreferences.filter(item => item !== cuisine) : [...this.cuisinePreferences, cuisine];
+  }
+  hasCuisine(cuisine: string): boolean { return this.cuisinePreferences.includes(cuisine); }
+
+  toggleEquipment(equipment: string): void {
+    this.availableEquipment = this.availableEquipment.includes(equipment) ? this.availableEquipment.filter(item => item !== equipment) : [...this.availableEquipment, equipment];
+  }
+  hasEquipment(equipment: string): boolean { return this.availableEquipment.includes(equipment); }
 
   isMealTypeSelected(type: MealType): boolean {
     return this.mealTypesSelected.includes(type);
@@ -171,6 +201,7 @@ export class PlanSetupPage {
 
     const payload = this.generationPayload();
     this.generating = true;
+    this.generationStep = 1;
     this.message = '';
     this.api.mealPlans(this.household?.id, this.startDate, this.endDate).subscribe({
       next: plans => {
@@ -217,14 +248,17 @@ export class PlanSetupPage {
 
   private submitGeneration(payload: MealPlanBatchGenerationPayload): void {
     this.generating = true;
+    this.generationStep = 2;
     this.message = '';
     this.api.generateMealPlanBatch(payload).subscribe({
       next: response => {
         this.generating = false;
+        this.generationStep = 0;
         this.router.navigate(['/plan-review', response.batch.id], { replaceUrl: true });
       },
       error: error => {
         this.generating = false;
+        this.generationStep = 0;
         this.message = this.errorMessage(error, 'Could not generate the meal-plan draft.');
       },
     });

@@ -48,6 +48,7 @@ export class RecipesPage implements OnDestroy {
     const userId = this.auth.user?.id;
     if (!this.api.hasToken || !userId) { this.message = 'Connect your account on Home to browse recipes.'; return; }
     this.loading = true;
+    this.searchError = '';
     this.householdContext.refresh(userId).subscribe({
       next: context => {
         this.families = context.families;
@@ -57,7 +58,7 @@ export class RecipesPage implements OnDestroy {
         this.loadFavorites();
         this.loadRecipes();
       },
-      error: () => { this.message = 'Could not load your household context.'; this.loading = false; },
+      error: () => { this.searchError = 'Could not load your household context. Check your connection and try again.'; this.loading = false; },
     });
   }
 

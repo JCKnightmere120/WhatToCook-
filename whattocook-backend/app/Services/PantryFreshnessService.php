@@ -22,13 +22,13 @@ class PantryFreshnessService
             return $this->estimatedForDryGood($purchaseSource);
         }
 
-        // Fresh and unpacked purchases from sari-sari stores, wet markets, or
-        // an unknown source need a prompt the next day.  Refrigeration improves
-        // confidence slightly; it does not remove the need for confirmation.
+        // Fresh unpacked purchases get a prompt tomorrow, not immediately on
+        // the day they are entered. The scheduled refresh marks them review
+        // only once that date arrives.
         return [
             'expiry_date' => now()->addDay()->toDateString(),
             'review_date' => now()->addDay()->toDateString(),
-            'status' => 'review',
+            'status' => 'fresh',
             'confidence' => $storage === 'refrigerated' ? 'medium' : 'low',
         ];
     }

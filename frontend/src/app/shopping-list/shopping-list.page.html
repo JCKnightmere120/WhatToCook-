@@ -6,21 +6,27 @@
 </ion-header>
 
 <ion-content>
-  <main class="page">
+  <main class="page wtc-direct-page shopping-page" id="main-content">
     <p *ngIf="household">Shared with {{ household.name }}</p>
-    <p class="message" *ngIf="message">{{ message }}</p>
+    <p class="message" *ngIf="message" role="status">{{ message }}</p>
 
-    <ion-card>
+    <ion-card class="shopping-add-card" aria-labelledby="shopping-add-title">
       <ion-card-content>
+        <h2 id="shopping-add-title">Add an item</h2>
         <ion-input label="Ingredient" labelPlacement="stacked" [(ngModel)]="name"></ion-input>
         <ion-grid><ion-row><ion-col><ion-input label="Quantity" labelPlacement="stacked" [(ngModel)]="quantity"></ion-input></ion-col><ion-col><ion-input label="Unit" labelPlacement="stacked" [(ngModel)]="unit"></ion-input></ion-col></ion-row></ion-grid>
         <ion-button expand="block" (click)="add()">Add item</ion-button>
       </ion-card-content>
     </ion-card>
 
-    <section class="purchase-tools" *ngIf="!loading && items.length">
+    <section class="purchase-tools" *ngIf="!loading && !loadError && items.length">
       <ion-note>{{ remainingItems.length }} item{{ remainingItems.length === 1 ? '' : 's' }} remaining</ion-note>
       <ion-button size="small" fill="outline" (click)="confirmMarkAll = true" [disabled]="!remainingItems.length || markingAll">{{ markingAll ? 'Updating…' : 'Mark all remaining bought' }}</ion-button>
+    </section>
+
+    <section class="export-tools" *ngIf="!loading && !loadError && items.length">
+      <ion-note>Export this {{ household ? 'shared' : 'personal' }} list</ion-note>
+      <div><ion-button size="small" fill="clear" (click)="export('text')">Text</ion-button><ion-button size="small" fill="clear" (click)="export('image')">Image</ion-button><ion-button size="small" fill="clear" (click)="export('pdf')">PDF</ion-button></div>
     </section>
 
     <ion-card *ngIf="purchaseItem" class="purchase-review">
@@ -36,8 +42,17 @@
       </ion-card-content>
     </ion-card>
 
-    <ion-spinner *ngIf="loading"></ion-spinner>
-    <ion-list *ngIf="!loading">
+    <section *ngIf="loading" class="wtc-state wtc-state--loading" role="status" aria-live="polite">
+      <ion-spinner aria-label="Loading shopping list"></ion-spinner>
+      <h2>Loading your shopping list</h2>
+    </section>
+    <section *ngIf="!loading && loadError" class="wtc-state wtc-state--error" role="alert">
+      <ion-icon class="wtc-state__icon" name="alert-circle-outline" aria-hidden="true"></ion-icon>
+      <h2>Shopping list is unavailable</h2>
+      <p>{{ loadError }}</p>
+      <ion-button fill="outline" (click)="load()">Try again</ion-button>
+    </section>
+    <ion-list *ngIf="!loading && !loadError" aria-label="Shopping list items">
       <ion-item *ngFor="let item of items">
         <ion-checkbox slot="start" [checked]="item.is_purchased" (ionChange)="toggle(item)" aria-label="Mark {{ item.ingredient_name }} as bought"></ion-checkbox>
         <ion-label [class.done]="item.is_purchased">{{ item.ingredient_name }}<p>{{ item.quantity || '' }} {{ item.unit || '' }}</p></ion-label>
@@ -45,7 +60,12 @@
         <ion-button fill="clear" color="danger" slot="end" (click)="remove(item)" aria-label="Remove {{ item.ingredient_name }}"><ion-icon name="trash-outline"></ion-icon></ion-button>
       </ion-item>
     </ion-list>
-    <p *ngIf="!loading && !items.length">No items yet. Add an ingredient or add missing recipe ingredients from Recipes.</p>
+    <section class="wtc-state wtc-state--empty" *ngIf="!loading && !loadError && !items.length">
+      <ion-icon class="wtc-state__icon" name="cart-outline" aria-hidden="true"></ion-icon>
+      <h2>Your shopping list is empty</h2>
+      <p>Add an ingredient or add missing recipe ingredients from Recipes.</p>
+      <ion-button fill="outline" routerLink="/tabs/recipes">Browse recipes</ion-button>
+    </section>
   </main>
 </ion-content>
 

@@ -1,6 +1,6 @@
 # WhatToCook ERD
 
-The visual ERD is retained as [capstone erd.jpg](capstone%20erd.jpg). This source-level ERD records the Phase 6 deliverable schema and is easier to review alongside migrations.
+The visual ERD is retained as [capstone erd.jpg](../capstone%20erd.jpg). This source-level ERD records the Phase 6 deliverable schema and is easier to review alongside migrations.
 
 ```mermaid
 erDiagram

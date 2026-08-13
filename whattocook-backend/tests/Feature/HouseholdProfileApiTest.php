@@ -90,6 +90,7 @@ class HouseholdProfileApiTest extends TestCase
             'visible_to_family' => [
                 'allergies' => false,
                 'likes' => false,
+                'dietary_restrictions' => true,
             ],
         ]);
 
@@ -104,6 +105,27 @@ class HouseholdProfileApiTest extends TestCase
         $this->actingAs($member, 'sanctum')->getJson("/api/families/{$family['id']}/household-profiles")
             ->assertOk()
             ->assertJsonFragment(['id' => $profile->id, 'name' => 'Lolo Ben']);
+    }
+
+    public function test_private_fields_are_hidden_until_explicitly_shared(): void
+    {
+        $owner = User::factory()->create();
+        $member = User::factory()->create();
+        $family = $this->createFamily($owner);
+        $this->actingAs($member, 'sanctum')->postJson('/api/families/join', ['join_code' => $family['join_code']])->assertCreated();
+        $profile = HouseholdProfile::create([
+            'family_id' => $family['id'], 'name' => 'Private profile',
+            'health_conditions' => ['asthma'], 'allergies' => ['shellfish'], 'likes' => ['adobo'],
+        ]);
+
+        $this->actingAs($member, 'sanctum')->getJson("/api/families/{$family['id']}/household-profiles/{$profile->id}")
+            ->assertOk()->assertJsonMissingPath('household_profile.health_conditions')
+            ->assertJsonMissingPath('household_profile.allergies')->assertJsonMissingPath('household_profile.likes');
+
+        $profile->update(['visible_to_family' => ['allergies' => true]]);
+        $this->actingAs($member, 'sanctum')->getJson("/api/families/{$family['id']}/household-profiles/{$profile->id}")
+            ->assertOk()->assertJsonPath('household_profile.allergies.0', 'shellfish')
+            ->assertJsonMissingPath('household_profile.health_conditions');
     }
 
     public function test_a_linked_member_can_update_its_own_profile_but_cannot_relink_it(): void

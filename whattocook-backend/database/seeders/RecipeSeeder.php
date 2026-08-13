@@ -21,6 +21,9 @@ class RecipeSeeder extends Seeder
                 'servings' => 4,
                 'meal_type' => 'lunch',
                 'difficulty' => 'easy',
+                'image' => 'https://upload.wikimedia.org/wikipedia/commons/3/38/Chicken_adobo.jpg',
+                'image_source_url' => 'https://commons.wikimedia.org/wiki/File:Chicken_adobo.jpg',
+                'image_attribution' => 'Chicken adobo — dbgg1979 on Flickr (CC BY 2.0), via Wikimedia Commons',
                 'calories' => 320, 'protein' => 28, 'carbs' => 6, 'fat' => 20,
                 'ingredients' => [
                     ['name' => 'chicken thighs', 'quantity' => '1', 'unit' => 'kg'],
@@ -42,6 +45,9 @@ class RecipeSeeder extends Seeder
                 'servings' => 6,
                 'meal_type' => 'lunch',
                 'difficulty' => 'medium',
+                'image' => 'https://upload.wikimedia.org/wikipedia/commons/f/f5/Sinigang_na_Baboy_DSCF4234.jpg',
+                'image_source_url' => 'https://commons.wikimedia.org/wiki/File:Sinigang_na_Baboy_DSCF4234.jpg',
+                'image_attribution' => 'Sinigang na Baboy — Joy D. Ganaden (CC BY-SA 4.0), via Wikimedia Commons',
                 'calories' => 280, 'protein' => 22, 'carbs' => 10, 'fat' => 16,
                 'ingredients' => [
                     ['name' => 'pork belly', 'quantity' => '1', 'unit' => 'kg'],
@@ -65,6 +71,9 @@ class RecipeSeeder extends Seeder
                 'servings' => 5,
                 'meal_type' => 'dinner',
                 'difficulty' => 'easy',
+                'image' => 'https://upload.wikimedia.org/wikipedia/commons/4/41/Pancit_bihon_1.jpg',
+                'image_source_url' => 'https://commons.wikimedia.org/wiki/File:Pancit_bihon_1.jpg',
+                'image_attribution' => 'Pancit bihon — Obsidian Soul (CC0), via Wikimedia Commons',
                 'calories' => 300, 'protein' => 15, 'carbs' => 45, 'fat' => 8,
                 'ingredients' => [
                     ['name' => 'bihon noodles', 'quantity' => '250', 'unit' => 'g'],
@@ -87,6 +96,9 @@ class RecipeSeeder extends Seeder
                 'servings' => 4,
                 'meal_type' => 'lunch',
                 'difficulty' => 'easy',
+                'image' => 'https://upload.wikimedia.org/wikipedia/commons/5/56/Chicken_tinola_with_green_papaya_and_lemongrass.jpg',
+                'image_source_url' => 'https://commons.wikimedia.org/wiki/File:Chicken_tinola_with_green_papaya_and_lemongrass.jpg',
+                'image_attribution' => 'Chicken tinola — Obsidian Soul (CC0), via Wikimedia Commons',
                 'calories' => 250, 'protein' => 26, 'carbs' => 8, 'fat' => 12,
                 'ingredients' => [
                     ['name' => 'chicken', 'quantity' => '1', 'unit' => 'kg'],
@@ -109,6 +121,9 @@ class RecipeSeeder extends Seeder
                 'servings' => 5,
                 'meal_type' => 'dinner',
                 'difficulty' => 'medium',
+                'image' => 'https://upload.wikimedia.org/wikipedia/commons/0/0a/Bicol_Express_at_La_Herencia_Comida.jpg',
+                'image_source_url' => 'https://commons.wikimedia.org/wiki/File:Bicol_Express_at_La_Herencia_Comida.jpg',
+                'image_attribution' => 'Bicol Express — Ymirazudis (CC BY-SA 4.0), via Wikimedia Commons',
                 'calories' => 400, 'protein' => 20, 'carbs' => 7, 'fat' => 32,
                 'ingredients' => [
                     ['name' => 'pork belly', 'quantity' => '500', 'unit' => 'g'],
@@ -130,6 +145,9 @@ class RecipeSeeder extends Seeder
                 'servings' => 6,
                 'meal_type' => 'dinner',
                 'difficulty' => 'hard',
+                'image' => 'https://upload.wikimedia.org/wikipedia/commons/0/0f/Kare-kare_at_La_Herencia_Comida.jpg',
+                'image_source_url' => 'https://commons.wikimedia.org/wiki/File:Kare-kare_at_La_Herencia_Comida.jpg',
+                'image_attribution' => 'Kare-kare — Ymirazudis (CC BY-SA 4.0), via Wikimedia Commons',
                 'calories' => 450, 'protein' => 25, 'carbs' => 14, 'fat' => 30,
                 'ingredients' => [
                     ['name' => 'oxtail', 'quantity' => '1', 'unit' => 'kg'],
@@ -152,6 +170,9 @@ class RecipeSeeder extends Seeder
                 'servings' => 5,
                 'meal_type' => 'lunch',
                 'difficulty' => 'easy',
+                'image' => 'https://upload.wikimedia.org/wikipedia/commons/c/c4/Ginisang_munggo_with_fried_bangus.jpg',
+                'image_source_url' => 'https://commons.wikimedia.org/wiki/File:Ginisang_munggo_with_fried_bangus.jpg',
+                'image_attribution' => 'Ginisang munggo — Pandakekok9 (CC0), via Wikimedia Commons',
                 'calories' => 260, 'protein' => 16, 'carbs' => 30, 'fat' => 8,
                 'ingredients' => [
                     ['name' => 'mung beans', 'quantity' => '1', 'unit' => 'cup'],
@@ -173,6 +194,9 @@ class RecipeSeeder extends Seeder
                 'servings' => 5,
                 'meal_type' => 'breakfast',
                 'difficulty' => 'easy',
+                'image' => 'https://upload.wikimedia.org/wikipedia/commons/6/6a/Arroz_Caldo%2C_Grape_Custard%2C_Fruits%2C_Virgin_Light.jpg',
+                'image_source_url' => 'https://commons.wikimedia.org/wiki/File:Arroz_Caldo,_Grape_Custard,_Fruits,_Virgin_Light.jpg',
+                'image_attribution' => 'Arroz caldo — George Parilla (CC BY 2.0), via Wikimedia Commons',
                 'calories' => 310, 'protein' => 18, 'carbs' => 40, 'fat' => 9,
                 'ingredients' => [
                     ['name' => 'chicken', 'quantity' => '500', 'unit' => 'g'],
@@ -194,6 +218,9 @@ class RecipeSeeder extends Seeder
                 'servings' => 5,
                 'meal_type' => 'lunch',
                 'difficulty' => 'medium',
+                'image' => 'https://upload.wikimedia.org/wikipedia/commons/5/59/Laing%2C_Bicolano_dish.jpg',
+                'image_source_url' => 'https://commons.wikimedia.org/wiki/File:Laing,_Bicolano_dish.jpg',
+                'image_attribution' => 'Laing — Lokalpedia (CC BY-SA 4.0), via Wikimedia Commons',
                 'calories' => 290, 'protein' => 8, 'carbs' => 12, 'fat' => 24,
                 'ingredients' => [
                     ['name' => 'dried taro leaves', 'quantity' => '200', 'unit' => 'g'],
@@ -214,6 +241,9 @@ class RecipeSeeder extends Seeder
                 'servings' => 4,
                 'meal_type' => 'dinner',
                 'difficulty' => 'easy',
+                'image' => 'https://upload.wikimedia.org/wikipedia/commons/1/1a/Chopsuey%2C_Jun_2024.jpg',
+                'image_source_url' => 'https://commons.wikimedia.org/wiki/File:Chopsuey,_Jun_2024.jpg',
+                'image_attribution' => 'Chopsuey — Ralff Nestor Nacor (CC BY-SA 4.0), via Wikimedia Commons',
                 'calories' => 220, 'protein' => 14, 'carbs' => 16, 'fat' => 10,
                 'ingredients' => [
                     ['name' => 'pork', 'quantity' => '200', 'unit' => 'g'],
@@ -236,6 +266,9 @@ class RecipeSeeder extends Seeder
                 'servings' => 4,
                 'meal_type' => 'lunch',
                 'difficulty' => 'easy',
+                'image' => 'https://upload.wikimedia.org/wikipedia/commons/4/4b/Ginataang_kalabasa_at_hipon_%28shrimp%2C_calabaza%2C_green_beans%2C_and_eggplant_in_coconut_milk%29_-_Philippines.jpg',
+                'image_source_url' => 'https://commons.wikimedia.org/wiki/File:Ginataang_kalabasa_at_hipon_(shrimp,_calabaza,_green_beans,_and_eggplant_in_coconut_milk)_-_Philippines.jpg',
+                'image_attribution' => 'Ginataang kalabasa at hipon — Yvette Tan (CC BY 2.0), via Wikimedia Commons',
                 'calories' => 240, 'protein' => 10, 'carbs' => 18, 'fat' => 16,
                 'ingredients' => [
                     ['name' => 'squash', 'quantity' => '500', 'unit' => 'g'],
@@ -257,6 +290,9 @@ class RecipeSeeder extends Seeder
                 'servings' => 6,
                 'meal_type' => 'dinner',
                 'difficulty' => 'medium',
+                'image' => 'https://upload.wikimedia.org/wikipedia/commons/d/df/Beef_Caldereta_Special.jpg',
+                'image_source_url' => 'https://commons.wikimedia.org/wiki/File:Beef_Caldereta_Special.jpg',
+                'image_attribution' => 'Beef Caldereta — LadyPinayForever (CC0), via Wikimedia Commons',
                 'calories' => 420, 'protein' => 30, 'carbs' => 15, 'fat' => 26,
                 'ingredients' => [
                     ['name' => 'beef chunks', 'quantity' => '1', 'unit' => 'kg'],
@@ -279,6 +315,9 @@ class RecipeSeeder extends Seeder
                 'servings' => 4,
                 'meal_type' => 'dinner',
                 'difficulty' => 'medium',
+                'image' => 'https://upload.wikimedia.org/wikipedia/commons/0/0a/Chicken_inasal_%28Philippines%29.jpg',
+                'image_source_url' => 'https://commons.wikimedia.org/wiki/File:Chicken_inasal_(Philippines).jpg',
+                'image_attribution' => 'Chicken inasal — Obsidian Soul (CC BY-SA 4.0), via Wikimedia Commons',
                 'calories' => 330, 'protein' => 31, 'carbs' => 5, 'fat' => 20,
                 'ingredients' => [
                     ['name' => 'chicken', 'quantity' => '1', 'unit' => 'kg'],
@@ -300,6 +339,9 @@ class RecipeSeeder extends Seeder
                 'servings' => 4,
                 'meal_type' => 'lunch',
                 'difficulty' => 'medium',
+                'image' => 'https://upload.wikimedia.org/wikipedia/commons/2/2c/Kinilaw_na_isda_%28Philippines%29.jpg',
+                'image_source_url' => 'https://commons.wikimedia.org/wiki/File:Kinilaw_na_isda_(Philippines).jpg',
+                'image_attribution' => 'Kinilaw na isda — Yvette Tan (CC BY 2.0), via Wikimedia Commons',
                 'calories' => 180, 'protein' => 25, 'carbs' => 6, 'fat' => 5,
                 'ingredients' => [
                     ['name' => 'fresh fish', 'quantity' => '500', 'unit' => 'g'],

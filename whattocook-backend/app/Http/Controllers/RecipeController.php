@@ -10,10 +10,13 @@ use App\Models\Recipe;
 use App\Services\RecipeMatcher;
 use App\Services\RecipeNutritionService;
 use App\Services\UsdaFoodDataService;
+use App\Services\FoodSafetyTaxonomy;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class RecipeController extends Controller
 {
+    public function __construct(private readonly FoodSafetyTaxonomy $foodSafety) {}
     public function match(Request $request, Recipe $recipe, RecipeMatcher $matcher)
     {
         $familyId = $request->validate(['family_id' => 'nullable|integer|exists:families,id'])['family_id'] ?? null;
@@ -36,7 +39,7 @@ class RecipeController extends Controller
             ? $this->profileBlockedIngredients(Profile::where('user_id', $request->user()->id)->first())
             : $this->familyBlockedIngredients($familyId);
         $results = Recipe::with('ingredients')->get()
-            ->filter(fn (Recipe $recipe) => ! $this->containsBlockedIngredient($recipe, $blockedIngredients))
+            ->filter(fn (Recipe $recipe) => ! $this->foodSafety->recipeConflicts($recipe, $blockedIngredients))
             ->map(fn (Recipe $recipe) => $matcher->match($recipe, $pantry))
             ->sortByDesc('match_percentage')
             ->values();
@@ -57,17 +60,7 @@ class RecipeController extends Controller
     {
         return HouseholdProfile::where('family_id', $familyId)->get()
             ->flatMap(function (HouseholdProfile $profile) {
-                $allergies = $profile->allergies ?? [];
-                $restrictions = $profile->dietary_restrictions ?? [];
-                $blocked = array_map('strtolower', $allergies);
-                if (in_array('vegetarian', array_map('strtolower', $restrictions), true)) {
-                    $blocked = [...$blocked, 'chicken', 'pork', 'beef', 'fish', 'seafood', 'meat'];
-                }
-                if (in_array('vegan', array_map('strtolower', $restrictions), true)) {
-                    $blocked = [...$blocked, 'chicken', 'pork', 'beef', 'fish', 'seafood', 'meat', 'egg', 'milk', 'dairy'];
-                }
-
-                return $blocked;
+                return $this->foodSafety->blockedTerms([$profile]);
             })
             ->filter()
             ->unique()
@@ -80,30 +73,7 @@ class RecipeController extends Controller
         if (! $profile) {
             return [];
         }
-        $blocked = array_map('strtolower', $profile->allergies ?? []);
-        $restrictions = array_map('strtolower', $profile->dietary_restrictions ?? []);
-        if (in_array('vegetarian', $restrictions, true)) {
-            $blocked = [...$blocked, 'chicken', 'pork', 'beef', 'fish', 'seafood', 'meat'];
-        }
-        if (in_array('vegan', $restrictions, true)) {
-            $blocked = [...$blocked, 'chicken', 'pork', 'beef', 'fish', 'seafood', 'meat', 'egg', 'milk', 'dairy'];
-        }
-
-        return array_values(array_unique($blocked));
-    }
-
-    private function containsBlockedIngredient(Recipe $recipe, array $blockedIngredients): bool
-    {
-        return $recipe->ingredients->contains(function ($ingredient) use ($blockedIngredients) {
-            $name = strtolower($ingredient->name);
-            foreach ($blockedIngredients as $blocked) {
-                if (str_contains($name, $blocked)) {
-                    return true;
-                }
-            }
-
-            return false;
-        });
+        return $this->foodSafety->blockedTerms([$profile])->all();
     }
 
     /**
@@ -144,8 +114,17 @@ class RecipeController extends Controller
                     ->orWhereHas('ingredients', fn ($ingredients) => $ingredients->where('name', 'like', "%{$search}%"));
             }));
 
-        $this->excludeBlockedIngredients($recipes, $blockedIngredients);
-        $results = $recipes->orderBy('name')->paginate($filters['per_page'] ?? 20)->withQueryString();
+        // Safety must use the same word-aware taxonomy as recommendations and
+        // plans (for example, vegan excludes "egg" but not "eggplant").
+        $perPage = $filters['per_page'] ?? 20;
+        $page = LengthAwarePaginator::resolveCurrentPage();
+        $safeRecipes = $recipes->orderBy('name')->get()
+            ->filter(fn (Recipe $recipe) => ! $this->foodSafety->recipeConflicts($recipe, $blockedIngredients))
+            ->values();
+        $results = new LengthAwarePaginator($safeRecipes->forPage($page, $perPage)->values(), $safeRecipes->count(), $perPage, $page, [
+            'path' => LengthAwarePaginator::resolveCurrentPath(),
+            'query' => $request->query(),
+        ]);
 
         if (! ($filters['include_match'] ?? false)) {
             return response()->json($results);
@@ -178,21 +157,6 @@ class RecipeController extends Controller
                 fn ($items) => $items->where('family_id', $familyId),
             )
             ->get();
-    }
-
-    private function excludeBlockedIngredients($recipes, array $blockedIngredients): void
-    {
-        if (empty($blockedIngredients)) {
-            return;
-        }
-
-        $recipes->whereDoesntHave('ingredients', function ($ingredients) use ($blockedIngredients) {
-            $ingredients->where(function ($blocked) use ($blockedIngredients) {
-                foreach ($blockedIngredients as $ingredient) {
-                    $blocked->orWhereRaw('LOWER(name) LIKE ?', ['%'.strtolower($ingredient).'%']);
-                }
-            });
-        });
     }
 
     public function show(Recipe $recipe)

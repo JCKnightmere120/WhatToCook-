@@ -34,9 +34,19 @@ describe('CookingPage', () => {
     component.next();
 
     expect(component.steps).toEqual(['Prepare the chicken.', 'Simmer with ginger.']);
+    expect(component.ingredientChecks).toEqual([false]);
     expect(component.progressLabel).toBe('Step 2 of 2');
     expect(progress.load).toHaveBeenCalledWith(7, 42, 2);
     expect(progress.save).toHaveBeenCalledWith(7, 42, 1);
+  });
+
+  it('keeps the ingredient checklist local to the guided cooking session', () => {
+    api.mealPlanPreflight.and.returnValue(of(preflight));
+    component.ionViewWillEnter();
+    component.toggleIngredient(0, true);
+
+    expect(component.checkedIngredientCount).toBe(1);
+    expect(component.ingredientChecks).toEqual([true]);
   });
 
   it('uses the existing pantry-deduction completion action at finish', () => {

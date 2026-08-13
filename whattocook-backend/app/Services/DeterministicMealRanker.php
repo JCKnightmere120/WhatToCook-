@@ -10,21 +10,30 @@ use Illuminate\Support\Collection;
 /** A stable, inspectable ranking policy. Safety exclusions always happen before scoring. */
 class DeterministicMealRanker
 {
-    public function rank(Collection $recipes, Collection $profiles, Collection $pantry, Collection $history, array $options, array $alreadyChosen = []): Collection
+    public function __construct(
+        private readonly FoodSafetyTaxonomy $foodSafety,
+        private readonly ChildMealPlanner $childPlanner,
+    ) {}
+
+    public function rank(Collection $recipes, Collection $profiles, Collection $pantry, Collection $history, array $options, array $alreadyChosen = [], ?Carbon $mealDate = null): Collection
     {
-        $blocked = $profiles->flatMap(fn ($p) => array_merge($p->allergies ?? [], $p->dietary_restrictions ?? []))
-            ->map(fn ($v) => strtolower(trim($v)))->filter()->unique();
-        if ($blocked->contains('vegetarian')) $blocked = $blocked->merge(['chicken', 'pork', 'beef', 'fish', 'seafood', 'meat']);
-        if ($blocked->contains('vegan')) $blocked = $blocked->merge(['egg', 'milk', 'dairy']);
         $likes = $profiles->flatMap(fn ($p) => $p->likes ?? [])->map(fn ($v) => strtolower($v));
         $dislikes = $profiles->flatMap(fn ($p) => $p->dislikes ?? [])->map(fn ($v) => strtolower($v));
-        $isYoungChild = $profiles->contains(fn ($p) => in_array($p->age_band ?? null, ['0-5_months', '6-11_months', '1_year', '2-5_years'], true));
+        // A child can cross an age-band boundary between planning and cooking.
+        // Always calculate eligibility for the scheduled meal date, never the
+        // date the API happened to load the household profile.
+        $mealDate ??= now();
+        $isYoungChild = $profiles->contains(fn ($p) => in_array(
+            $this->childPlanner->ageBand($p->birth_date, $mealDate),
+            ['0-5_months', '6-11_months', '12-23_months', '2-5_years'],
+            true,
+        ));
         $strict = ($options['time_preference'] ?? 'flexible') === 'strict';
         $budget = $this->budget($options['cooking_time_budget'] ?? '60');
 
-        return $recipes->filter(function (Recipe $recipe) use ($blocked, $isYoungChild) {
+        return $recipes->filter(function (Recipe $recipe) use ($profiles, $isYoungChild) {
             $terms = $this->terms($recipe);
-            if ($blocked->contains(fn ($term) => $terms->contains(fn ($text) => str_contains($text, $term)))) return false;
+            if (! $this->foodSafety->recipeIsSafe($recipe, $profiles)) return false;
             // Conservative child rule: recipes with alcohol or explicitly very spicy ingredients are not auto-selected.
             return ! $isYoungChild || ! $terms->contains(fn ($text) => str_contains($text, 'alcohol') || str_contains($text, 'siling labuyo'));
         })->filter(fn (Recipe $recipe) => ! $strict || $this->minutes($recipe) <= $budget)

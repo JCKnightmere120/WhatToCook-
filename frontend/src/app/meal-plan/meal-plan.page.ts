@@ -20,6 +20,7 @@ export class MealPlanPage {
   diners: HouseholdProfile[] = [];
   recipes: Recommendation[] = [];
   plans: MealPlan[] = [];
+  readonly readinessByPlan = new Map<number, 'ready' | 'attention' | 'unavailable'>();
   draft?: PlannerDraft;
   loading = false;
   saving = false;
@@ -30,6 +31,7 @@ export class MealPlanPage {
     { text: 'Delete meal', role: 'destructive', handler: () => this.confirmRemove() },
   ];
   message = '';
+  loadError = '';
   private periodStart = this.startOfWeek(new Date());
 
   constructor(private api: ApiService, private householdContext: HouseholdContextService, private auth: AuthService, private router: Router, private route: ActivatedRoute) {
@@ -46,6 +48,7 @@ export class MealPlanPage {
     if (!userId || !this.api.hasToken) return;
     this.loading = true;
     this.message = '';
+    this.loadError = '';
     this.householdContext.refresh(userId).pipe(
       switchMap(context => {
         this.household = context.activeFamily || undefined;
@@ -55,13 +58,14 @@ export class MealPlanPage {
           ? forkJoin({ profiles: this.api.householdProfiles(this.household.id), recommendations: this.api.recommendations(this.household.id), plans: this.api.mealPlans(this.household.id) })
           : forkJoin({ profiles: of({ household_profiles: [] as HouseholdProfile[] }), recommendations: this.api.recommendations(), plans: this.api.mealPlans() });
       }),
-      catchError(() => { this.message = 'Could not load the meal planner.'; return of({ profiles: { household_profiles: [] as HouseholdProfile[] }, recommendations: { recommendations: [] as Recommendation[] }, plans: [] as MealPlan[] }); }),
+      catchError(() => { this.loadError = 'Could not load the meal planner. Check your connection and try again.'; return of({ profiles: { household_profiles: [] as HouseholdProfile[] }, recommendations: { recommendations: [] as Recommendation[] }, plans: [] as MealPlan[] }); }),
     ).subscribe(result => {
       this.diners = result.profiles.household_profiles;
       this.recipes = result.recommendations.recommendations;
       this.plans = this.household ? result.plans.filter(plan => plan.family_id === this.household?.id) : result.plans.filter(plan => !plan.family_id);
       this.setDays();
       this.loading = false;
+      this.loadReadiness();
     });
   }
 
@@ -91,6 +95,9 @@ export class MealPlanPage {
   }
   openGeneration(): void { this.router.navigate(['/plan-setup']); }
   openMealDetails(plan: MealPlan): void { this.router.navigate(['/meal-details', plan.id]); }
+  openShoppingList(): void { this.router.navigate(['/shopping-list']); }
+  readiness(plan: MealPlan): 'ready' | 'attention' | 'unavailable' | 'cooked' { return this.isCooked(plan) ? 'cooked' : this.readinessByPlan.get(plan.id) || 'unavailable'; }
+  readinessLabel(plan: MealPlan): string { return ({ ready: 'Pantry ready', attention: 'Needs groceries', cooked: 'Cooked', unavailable: 'Check pantry' })[this.readiness(plan)]; }
 
   save(): void {
     if (!this.draft?.recipeId) { this.message = 'Choose a recipe before saving this meal.'; return; }
@@ -110,6 +117,12 @@ export class MealPlanPage {
   periodLabel(): string { return `${this.days[0]?.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) || ''} – ${this.days[this.days.length - 1]?.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) || ''}`; }
   private startOfWeek(date: Date): Date { const result = new Date(date); const offset = (result.getDay() + 6) % 7; result.setDate(result.getDate() - offset); result.setHours(0, 0, 0, 0); return result; }
   private setDays(): void { this.days = Array.from({ length: this.periodWeeks * 7 }, (_, index) => this.addDays(this.periodStart, index)); }
+  private loadReadiness(): void {
+    this.readinessByPlan.clear();
+    const activePlans = this.plans.filter(plan => !this.isCooked(plan));
+    if (!activePlans.length) return;
+    forkJoin(activePlans.map(plan => this.api.mealPlanPreflight(plan.id).pipe(catchError(() => of(undefined))))).subscribe(checks => checks.forEach((check, index) => this.readinessByPlan.set(activePlans[index].id, check ? (check.can_cook_from_pantry ? 'ready' : 'attention') : 'unavailable')));
+  }
   private addDays(date: Date, days: number): Date { const result = new Date(date); result.setDate(result.getDate() + days); return result; }
   private dateOnly(value: Date | string): string { return typeof value === 'string' ? value.slice(0, 10) : `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`; }
 }

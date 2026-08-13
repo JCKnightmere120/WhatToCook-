@@ -12,7 +12,11 @@
     <ion-spinner *ngIf="loading" class="loading" aria-label="Loading plan options"></ion-spinner>
 
     <ng-container *ngIf="!loading">
-      <p class="intro">Set up a draft first. You can inspect the proposed meals and ingredients before anything is added to your calendar.</p>
+      <section class="setup-hero">
+        <span>WEEKLY MEAL PLANNER</span>
+        <h1>Build a plan that fits your week.</h1>
+        <p>Choose your routine and preferences. You’ll review a draft before anything is added to your calendar.</p>
+      </section>
       <ion-text color="danger" *ngIf="message"><p class="message">{{ message }}</p></ion-text>
 
       <ion-list inset="true">
@@ -29,8 +33,13 @@
 
       <ion-list inset="true">
         <ion-list-header>
-          <ion-label>Plan period</ion-label>
+          <ion-label>Plan your week</ion-label>
         </ion-list-header>
+        <ion-item lines="none" class="week-length">
+          <div class="choice-grid" role="group" aria-label="Plan length">
+            <button type="button" *ngFor="let length of planLengths" [class.selected]="planLength === length" (click)="setPlanLength(length)">{{ length }} {{ length === 1 ? 'week' : 'weeks' }}</button>
+          </div>
+        </ion-item>
         <ion-item>
           <ion-input label="Start date" labelPlacement="stacked" type="date" [min]="minimumDate" [(ngModel)]="startDate"></ion-input>
         </ion-item>
@@ -58,6 +67,17 @@
         <ion-item><ion-select label="Time limit" labelPlacement="stacked" [(ngModel)]="timePreference"><ion-select-option value="strict">Strict — exclude meals over budget</ion-select-option><ion-select-option value="flexible">Flexible — prefer the budget</ion-select-option></ion-select></ion-item>
         <ion-item><ion-select label="Leftovers / meal pattern" labelPlacement="stacked" [(ngModel)]="leftoverStrategy"><ion-select-option value="avoid_leftovers">Different meals where possible</ion-select-option><ion-select-option value="reuse_ulam">Reuse one ulam across requested meals</ion-select-option><ion-select-option value="main_with_rice_side">Main dish with rice or side</ion-select-option></ion-select></ion-item>
         <ion-item><ion-note color="medium">The planner ranks safely first, then nutrition, pantry and expiry use, time, preferences, variety, and waste reduction.</ion-note></ion-item>
+      </ion-list>
+
+      <ion-list inset="true" class="preference-list">
+        <ion-list-header><ion-label>Your preferences</ion-label></ion-list-header>
+        <ion-item lines="none"><ion-label class="preference-label"><h2>Favorite cuisines</h2><p>Choose flavors to keep in mind when you review your draft.</p></ion-label></ion-item>
+        <ion-item lines="none"><div class="choice-grid" role="group" aria-label="Favorite cuisines"><button type="button" *ngFor="let cuisine of cuisineOptions" [class.selected]="hasCuisine(cuisine)" (click)="toggleCuisine(cuisine)">{{ cuisine }}</button></div></ion-item>
+        <ion-item><ion-select label="Dietary needs" labelPlacement="stacked" [(ngModel)]="dietPreference"><ion-select-option value="saved-profile">Use saved profile restrictions</ion-select-option><ion-select-option value="review-profile">Review profile before planning</ion-select-option></ion-select></ion-item>
+        <ion-item><ion-note color="medium">Allergy, dietary, and child-safety exclusions are always checked from the selected profile.</ion-note></ion-item>
+        <ion-item lines="none"><ion-label class="preference-label"><h2>Available equipment</h2><p>Keep your kitchen setup in view as you choose meals.</p></ion-label></ion-item>
+        <ion-item lines="none"><div class="choice-grid" role="group" aria-label="Available equipment"><button type="button" *ngFor="let equipment of equipmentOptions" [class.selected]="hasEquipment(equipment.value)" (click)="toggleEquipment(equipment.value)"><ion-icon [name]="equipment.icon"></ion-icon>{{ equipment.label }}</button></div></ion-item>
+        <ion-item><ion-note color="medium">Cuisine and equipment choices are planning notes for your review; the planner still verifies safety and pantry availability.</ion-note></ion-item>
       </ion-list>
 
       <ion-list inset="true" *ngIf="household; else personalProfile">
@@ -128,9 +148,18 @@
         </ion-item>
       </ion-list>
 
-      <ion-button expand="block" (click)="generate()" [disabled]="generating">
+      <section class="generate-card" *ngIf="!generating">
+        <h2>Ready when you are</h2>
+        <p>Your plan opens as a draft, so you can change meals and check ingredients before saving.</p>
+        <ion-button expand="block" (click)="generate()">
         {{ generating ? 'Generating draft…' : 'Generate draft' }}
-      </ion-button>
+        </ion-button>
+      </section>
+      <section class="generate-card progress-card" *ngIf="generating" role="status" aria-live="polite">
+        <ion-spinner aria-label="Generating your meal plan"></ion-spinner>
+        <div><span>CREATING YOUR DRAFT</span><h2>{{ generationStep === 1 ? 'Checking your week…' : 'Finding meals for your plan…' }}</h2><p>{{ generationStep === 1 ? 'Reviewing dates, diners, and existing meals.' : 'Checking profile safety, pantry availability, and variety.' }}</p></div>
+        <div class="progress-steps"><b class="complete">1</b><i></i><b [class.complete]="generationStep === 2">2</b><i></i><b>3</b></div>
+      </section>
     </ng-container>
   </main>
 </ion-content>

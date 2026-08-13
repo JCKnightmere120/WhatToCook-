@@ -53,3 +53,16 @@ ion-note {
   display: block;
   margin: -2px 4px 4px;
 }
+
+.swap-sheet__intro { margin: 0 0 16px; color: #53645a; line-height: 1.45; }
+.swap-options { display: grid; gap: 9px; }
+.swap-option { display: flex; width: 100%; gap: 12px; padding: 13px; border: 1px solid #dce6de; border-radius: 13px; background: #fff; color: #263a31; text-align: left; }
+.swap-option--selected { border-color: #387247; background: #f0f8f0; box-shadow: 0 0 0 1px #387247; }
+.swap-option__radio { display: grid; flex: 0 0 20px; width: 20px; height: 20px; place-items: center; border: 1px solid #94a99a; border-radius: 50%; color: #fff; }
+.swap-option--selected .swap-option__radio { border-color: #387247; background: #387247; }
+.swap-option__body { min-width: 0; }
+.swap-option__body strong, .swap-option__body small, .swap-option__body em { display: block; }
+.swap-option__body small { margin-top: 3px; color: #65756b; font-size: 12px; }
+.swap-option__body em { margin-top: 7px; color: #287340; font-size: 12px; font-style: normal; font-weight: 700; }
+.swap-option__body em.attention { color: #a45b0c; }
+.swap-sheet__save { margin-top: 18px; }

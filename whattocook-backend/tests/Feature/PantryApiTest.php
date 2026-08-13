@@ -106,7 +106,7 @@ class PantryApiTest extends TestCase
         }
     }
 
-    public function test_items_without_a_printed_expiry_are_marked_for_freshness_review_and_can_be_extended(): void
+    public function test_items_without_a_printed_expiry_are_prompted_for_review_the_next_day_and_can_be_extended(): void
     {
         Carbon::setTestNow('2026-07-21 12:00:00');
         try {
@@ -118,7 +118,7 @@ class PantryApiTest extends TestCase
             ])->assertCreated()->json('item');
 
             $this->assertSame('2026-07-22T00:00:00.000000Z', $item['expiry_date']);
-            $this->assertSame('review', $item['freshness_status']);
+            $this->assertSame('fresh', $item['freshness_status']);
             $this->assertTrue($item['is_expiry_estimated']);
             $this->assertDatabaseHas('pantry_items', ['id' => $item['id'], 'freshness_confidence' => 'low']);
 
@@ -152,7 +152,7 @@ class PantryApiTest extends TestCase
             $this->assertSame('fresh', $packaged['freshness_status']);
             $this->assertSame('low', $packaged['freshness_confidence']);
             $this->assertSame('2026-07-22T00:00:00.000000Z', $fresh['freshness_review_date']);
-            $this->assertSame('review', $fresh['freshness_status']);
+            $this->assertSame('fresh', $fresh['freshness_status']);
         } finally {
             Carbon::setTestNow();
         }

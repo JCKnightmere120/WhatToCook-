@@ -61,6 +61,22 @@ class NutritionApiTest extends TestCase
             ->assertJsonPath('data_status', 'partial')->assertJsonPath('unknown_nutrients.protein.0', 'Partial food');
     }
 
+    public function test_meal_plan_summary_is_incomplete_when_a_linked_food_lacks_nutrient_fields(): void
+    {
+        $user = User::factory()->create();
+        $food = NutritionFood::create([
+            'description' => 'Calories only', 'normalized_name' => 'calories only', 'source' => 'usda',
+            'nutrients' => ['calories' => 100, 'protein' => 0, 'carbs' => 0, 'fat' => 0, 'fiber' => 0, 'sodium' => 0, 'sugar' => 0, 'available_nutrients' => ['calories']],
+        ]);
+        $recipe = Recipe::create(['name' => 'Partial plan meal', 'instructions' => 'Cook.', 'servings' => 1, 'created_by' => $user->id]);
+        $recipe->ingredients()->create(['name' => 'Calories only', 'quantity' => '100', 'unit' => 'g', 'nutrition_food_id' => $food->id]);
+        $this->actingAs($user, 'sanctum')->postJson('/api/meal-plans', ['recipe_id' => $recipe->id, 'planned_date' => '2026-08-04', 'meal_type' => 'dinner', 'servings' => 1])->assertCreated();
+
+        $this->actingAs($user, 'sanctum')->getJson('/api/meal-plans/nutrition?start_date=2026-08-04&end_date=2026-08-04')
+            ->assertOk()->assertJsonPath('is_nutrition_complete', false)->assertJsonPath('data_status', 'incomplete')
+            ->assertJsonPath('incomplete_meals.0.unknown_nutrients.protein.0', 'Calories only');
+    }
+
     public function test_usda_food_is_cached_and_linked_to_an_ingredient_server_side(): void
     {
         $user = User::factory()->create();

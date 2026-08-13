@@ -1,1 +1,71 @@
 
+:host {
+  display: block;
+  height: 100%;
+}
+
+.wtc-shell-header ion-title {
+  display: grid;
+  gap: 0.125rem;
+  padding-inline: 0.25rem;
+  text-align: start;
+}
+
+.wtc-shell-header__brand,
+.wtc-shell-header__page {
+  display: block;
+}
+
+.wtc-shell-header__brand {
+  color: var(--wtc-color-primary);
+  font-size: var(--wtc-font-size-xs);
+  font-weight: 800;
+  letter-spacing: var(--wtc-letter-spacing-label);
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.wtc-shell-header__page {
+  color: var(--wtc-color-text);
+  font-size: var(--wtc-font-size-md);
+  font-weight: 750;
+  line-height: 1.1;
+}
+
+.wtc-tabs-shell ion-tab-bar {
+  --background: var(--wtc-color-surface);
+  --border: 0;
+  --color: var(--wtc-color-text-muted);
+  --color-selected: var(--wtc-color-primary);
+  min-height: calc(4.5rem + env(safe-area-inset-bottom));
+  padding: var(--wtc-space-1) var(--wtc-space-2) env(safe-area-inset-bottom);
+  border-top: 1px solid var(--wtc-color-border);
+  box-shadow: 0 -8px 24px rgba(72, 44, 34, 0.08);
+}
+
+.wtc-tabs-shell ion-tab-button {
+  --background: transparent;
+  --background-focused: var(--wtc-color-primary-soft);
+  --color: var(--wtc-color-text-muted);
+  --color-selected: var(--wtc-color-primary);
+  min-height: 3.75rem;
+  border-radius: var(--wtc-radius-md);
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+.wtc-tabs-shell ion-tab-button::part(native) {
+  border-radius: var(--wtc-radius-md);
+}
+
+.wtc-tabs-shell ion-tab-button.tab-selected::part(native) {
+  background: var(--wtc-color-primary-soft);
+}
+
+.wtc-tabs-shell ion-tab-button ion-icon {
+  font-size: 1.3125rem;
+}
+
+.wtc-tabs-shell ion-tab-button ion-label {
+  margin-top: 0.1875rem;
+}

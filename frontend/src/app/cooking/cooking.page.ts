@@ -13,6 +13,7 @@ import { CookingProgressService } from '../services/cooking-progress.service';
 export class CookingPage {
   preflight?: MealPlanPreflight;
   steps: string[] = [];
+  ingredientChecks: boolean[] = [];
   stepIndex = 0;
   loading = false;
   finishing = false;
@@ -57,6 +58,8 @@ export class CookingPage {
   get isLastStep(): boolean { return this.stepIndex === this.steps.length - 1; }
   get progressValue(): number { return this.steps.length ? (this.stepIndex + 1) / this.steps.length : 0; }
   get progressLabel(): string { return this.steps.length ? `Step ${this.stepIndex + 1} of ${this.steps.length}` : 'No steps available'; }
+  get totalTime(): number { return (this.preflight?.recipe.prep_time || 0) + (this.preflight?.recipe.cook_time || 0); }
+  get checkedIngredientCount(): number { return this.ingredientChecks.filter(Boolean).length; }
 
   ingredientLabel(ingredient: RecipeIngredient): string {
     return [ingredient.quantity, ingredient.unit, ingredient.name].filter(Boolean).join(' ');
@@ -64,6 +67,7 @@ export class CookingPage {
 
   previous(): void { this.setStep(this.stepIndex - 1); }
   next(): void { this.setStep(this.stepIndex + 1); }
+  toggleIngredient(index: number, checked: boolean): void { this.ingredientChecks[index] = checked; }
   startTimer(): void {
     if (this.timerRunning) return;
     if (this.timerSeconds <= 0) this.timerSeconds = Math.max(1, Math.min(180, Number(this.timerMinutes) || 1)) * 60;
@@ -100,6 +104,7 @@ export class CookingPage {
         }
         this.preflight = preflight;
         this.steps = this.parseSteps(preflight.recipe.instructions);
+        this.ingredientChecks = preflight.recipe.ingredients.map(() => false);
         this.stepIndex = this.progress.load(this.auth.user!.id, this.mealPlanId!, this.steps.length).stepIndex;
         this.loading = false;
       },

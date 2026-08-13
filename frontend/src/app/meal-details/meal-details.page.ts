@@ -258,6 +258,13 @@ export class MealDetailsPage {
     return value ? `${value.charAt(0).toUpperCase()}${value.slice(1)}` : 'Meal';
   }
 
+  swapPantryLabel(item: Recommendation): string {
+    const missing = item.missing_ingredients?.length || 0;
+    const review = item.needs_review_ingredients?.length || 0;
+    if (!missing && !review) return 'Pantry ready';
+    return missing ? `${missing} ingredient${missing === 1 ? '' : 's'} to buy` : 'Check pantry quantity';
+  }
+
   private loadDiners(plan: MealPlan): void {
     this.diners = [];
     if (!plan.family_id) return;

@@ -35,3 +35,640 @@
 /* The app starts in the light palette to match the approved dashboard direction.
  * `dark.class.css` is retained for the explicit theme control planned in Settings. */
 @import "@ionic/angular/css/palettes/dark.class.css";
+
+/*
+ * WhatToCook design foundation
+ *
+ * Tokens live in theme/variables.scss. The rules below deliberately style Ionic
+ * primitives and reusable utility classes only; routes and feature behavior stay
+ * owned by their existing pages.
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+ion-app {
+  min-height: 100%;
+}
+
+html {
+  background: var(--wtc-color-canvas);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--wtc-color-canvas);
+  color: var(--wtc-color-text);
+  font-family: var(--wtc-font-family);
+  font-size: var(--wtc-font-size-base);
+  line-height: var(--wtc-line-height-body);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+ion-app {
+  background: var(--wtc-color-canvas);
+  color: var(--wtc-color-text);
+}
+
+ion-content {
+  --background: var(--wtc-color-canvas);
+  --color: var(--wtc-color-text);
+}
+
+a {
+  color: var(--wtc-color-primary);
+  font-weight: 600;
+}
+
+a:focus-visible,
+button:focus-visible,
+ion-button:focus-visible,
+ion-back-button:focus-visible,
+ion-tab-button:focus-visible,
+ion-item[button]:focus-visible {
+  outline: none;
+  box-shadow: var(--wtc-focus-ring);
+}
+
+h1,
+h2,
+h3,
+h4 {
+  color: var(--wtc-color-text);
+  font-weight: 700;
+  line-height: var(--wtc-line-height-heading);
+}
+
+h1 {
+  font-size: var(--wtc-font-size-2xl);
+  letter-spacing: var(--wtc-letter-spacing-tight);
+}
+
+h2 {
+  font-size: var(--wtc-font-size-xl);
+  letter-spacing: -0.012em;
+}
+
+h3 {
+  font-size: var(--wtc-font-size-lg);
+}
+
+p,
+li {
+  color: var(--wtc-color-text-muted);
+}
+
+/* Headers */
+ion-header {
+  background: var(--wtc-color-surface);
+  box-shadow: none;
+}
+
+ion-header::after {
+  height: 1px;
+  background-image: none;
+  background-color: var(--wtc-color-border);
+}
+
+ion-toolbar {
+  --background: var(--wtc-color-surface);
+  --color: var(--wtc-color-text);
+  --border-color: var(--wtc-color-border);
+  --min-height: 3.75rem;
+  --padding-start: var(--wtc-space-2);
+  --padding-end: var(--wtc-space-2);
+}
+
+ion-title {
+  color: var(--wtc-color-text);
+  font-size: var(--wtc-font-size-md);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+ion-back-button {
+  --color: var(--wtc-color-primary);
+  --icon-font-size: 1.25rem;
+  font-weight: 600;
+}
+
+/* Buttons */
+ion-button {
+  --background: var(--wtc-color-primary);
+  --background-hover: var(--ion-color-primary-tint);
+  --background-activated: var(--ion-color-primary-shade);
+  --border-radius: var(--wtc-radius-md);
+  --box-shadow: var(--wtc-shadow-xs);
+  --color: var(--ion-color-primary-contrast);
+  --padding-start: 1rem;
+  --padding-end: 1rem;
+  --padding-top: 0.6875rem;
+  --padding-bottom: 0.6875rem;
+  font-size: var(--wtc-font-size-sm);
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+ion-button:not([size="small"]) {
+  min-height: 2.75rem;
+}
+
+ion-button[fill="outline"]:not(.ion-color) {
+  --background: transparent;
+  --border-color: var(--wtc-color-primary);
+  --border-width: 1px;
+  --color: var(--wtc-color-primary);
+  --box-shadow: none;
+}
+
+ion-button[fill="clear"]:not(.ion-color) {
+  --background: transparent;
+  --background-hover: var(--wtc-color-primary-soft);
+  --background-activated: var(--wtc-color-primary-soft);
+  --color: var(--wtc-color-primary);
+  --box-shadow: none;
+}
+
+ion-button[disabled] {
+  --opacity: 0.52;
+}
+
+/* Cards and lists */
+ion-card,
+.wtc-card {
+  --background: var(--wtc-color-surface);
+  --color: var(--wtc-color-text);
+  border: 1px solid var(--wtc-color-border);
+  border-radius: var(--wtc-radius-lg);
+  background: var(--wtc-color-surface);
+  color: var(--wtc-color-text);
+  box-shadow: var(--wtc-shadow-card);
+}
+
+.wtc-card {
+  padding: var(--wtc-space-5);
+}
+
+ion-card-header {
+  padding: var(--wtc-space-5) var(--wtc-space-5) var(--wtc-space-2);
+}
+
+ion-card-content {
+  padding: var(--wtc-space-4) var(--wtc-space-5) var(--wtc-space-5);
+}
+
+ion-card-title {
+  color: var(--wtc-color-text);
+  font-size: var(--wtc-font-size-lg);
+  font-weight: 700;
+  line-height: var(--wtc-line-height-heading);
+}
+
+ion-card-subtitle {
+  color: var(--wtc-color-text-muted);
+  font-size: var(--wtc-font-size-sm);
+  font-weight: 500;
+  line-height: var(--wtc-line-height-body);
+  text-transform: none;
+}
+
+ion-list {
+  background: transparent;
+}
+
+ion-list[inset="true"],
+ion-list[inset] {
+  overflow: hidden;
+  border: 1px solid var(--wtc-color-border);
+  border-radius: var(--wtc-radius-lg);
+  background: var(--wtc-color-surface);
+  box-shadow: var(--wtc-shadow-xs);
+}
+
+ion-item {
+  --background: var(--wtc-color-surface);
+  --color: var(--wtc-color-text);
+  --border-color: var(--wtc-color-border);
+  --inner-padding-end: var(--wtc-space-4);
+  --padding-start: var(--wtc-space-4);
+  --min-height: 3rem;
+}
+
+ion-list[inset] ion-item {
+  --background: transparent;
+}
+
+ion-item::part(native) {
+  transition: background-color var(--wtc-transition-fast);
+}
+
+ion-item[button]::part(native):hover {
+  background: var(--wtc-color-surface-muted);
+}
+
+ion-item h2,
+ion-item h3,
+ion-item p {
+  color: inherit;
+}
+
+ion-item p,
+ion-note {
+  color: var(--wtc-color-text-muted);
+}
+
+/* Form controls */
+ion-input,
+ion-textarea,
+ion-select {
+  --background: var(--wtc-color-surface);
+  --border-color: var(--wtc-color-border-strong);
+  --border-width: 1px;
+  --border-style: solid;
+  --border-radius: var(--wtc-radius-md);
+  --color: var(--wtc-color-text);
+  --placeholder-color: var(--wtc-color-text-subtle);
+  --placeholder-opacity: 1;
+  --highlight-color-focused: var(--wtc-color-primary);
+  --highlight-color-valid: var(--wtc-color-success);
+  --highlight-color-invalid: var(--wtc-color-danger);
+  --padding-top: 0.75rem;
+  --padding-bottom: 0.75rem;
+  --padding-start: var(--wtc-space-3);
+  --padding-end: var(--wtc-space-3);
+  border: 1px solid var(--wtc-color-border-strong);
+  border-radius: var(--wtc-radius-md);
+  background: var(--wtc-color-surface);
+  color: var(--wtc-color-text);
+  transition: border-color var(--wtc-transition-fast), box-shadow var(--wtc-transition-fast);
+}
+
+ion-input,
+ion-select {
+  min-height: 3rem;
+}
+
+ion-textarea {
+  min-height: 6rem;
+}
+
+ion-input.has-focus,
+ion-input.ion-focused,
+ion-textarea.has-focus,
+ion-textarea.ion-focused,
+ion-select.has-focus,
+ion-select.ion-focused {
+  border-color: var(--wtc-color-primary);
+  box-shadow: var(--wtc-focus-ring);
+}
+
+ion-input.ion-touched.ion-invalid,
+ion-textarea.ion-touched.ion-invalid,
+ion-select.ion-touched.ion-invalid {
+  border-color: var(--wtc-color-danger);
+}
+
+ion-item ion-input,
+ion-item ion-textarea,
+ion-item ion-select {
+  --background: transparent;
+  --border-color: transparent;
+  --border-width: 0;
+  --padding-start: 0;
+  --padding-end: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+ion-checkbox {
+  --size: 1.25rem;
+  --border-color: var(--wtc-color-border-strong);
+  --border-color-checked: var(--wtc-color-primary);
+  --checkbox-background: var(--wtc-color-surface);
+  --checkbox-background-checked: var(--wtc-color-primary);
+  --checkmark-color: var(--ion-color-primary-contrast);
+}
+
+ion-toggle {
+  --track-background: var(--wtc-color-border);
+  --track-background-checked: var(--wtc-color-primary);
+  --handle-background: var(--wtc-color-surface);
+  --handle-background-checked: var(--ion-color-primary-contrast);
+}
+
+ion-segment {
+  --background: var(--wtc-color-surface-muted);
+  border: 1px solid var(--wtc-color-border);
+  border-radius: var(--wtc-radius-md);
+  padding: var(--wtc-space-1);
+}
+
+ion-segment-button {
+  --color: var(--wtc-color-text-muted);
+  --color-checked: var(--wtc-color-text);
+  --indicator-color: var(--wtc-color-surface);
+  --indicator-box-shadow: var(--wtc-shadow-xs);
+  --border-radius: calc(var(--wtc-radius-md) - 0.1875rem);
+  min-height: 2.5rem;
+  font-size: var(--wtc-font-size-sm);
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* Tabs */
+ion-tab-bar {
+  --background: var(--wtc-color-surface);
+  --border: 1px solid var(--wtc-color-border);
+  --color: var(--wtc-color-text-muted);
+  --color-selected: var(--wtc-color-primary);
+  min-height: 4rem;
+  padding-top: var(--wtc-space-1);
+  box-shadow: 0 -4px 18px rgba(72, 44, 34, 0.05);
+}
+
+ion-tab-button {
+  --color: var(--wtc-color-text-muted);
+  --color-selected: var(--wtc-color-primary);
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+ion-tab-button ion-icon {
+  font-size: 1.25rem;
+}
+
+ion-tab-button ion-label {
+  margin-top: var(--wtc-space-1);
+  font-size: inherit;
+}
+
+/* Status patterns: use .wtc-status-chip plus one semantic modifier on future UI. */
+ion-chip,
+.wtc-status-chip {
+  --background: var(--wtc-color-neutral-soft);
+  --color: var(--wtc-color-text-muted);
+  --wtc-status-background: var(--wtc-color-neutral-soft);
+  --wtc-status-foreground: var(--wtc-color-text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--wtc-space-1);
+  min-height: 1.75rem;
+  margin: 0;
+  border: 1px solid transparent;
+  border-radius: var(--wtc-radius-pill);
+  background: var(--wtc-status-background);
+  color: var(--wtc-status-foreground);
+  font-size: var(--wtc-font-size-xs);
+  font-weight: 700;
+  letter-spacing: var(--wtc-letter-spacing-label);
+  line-height: 1;
+}
+
+ion-chip {
+  --background: var(--wtc-status-background);
+  --color: var(--wtc-status-foreground);
+}
+
+ion-badge {
+  --background: var(--wtc-color-primary-soft);
+  --color: var(--wtc-color-primary-strong);
+  min-height: 1.5rem;
+  border-radius: var(--wtc-radius-pill);
+  font-size: var(--wtc-font-size-xs);
+  font-weight: 700;
+  letter-spacing: var(--wtc-letter-spacing-label);
+}
+
+.wtc-status-chip--success,
+.wtc-status-success {
+  --wtc-status-background: var(--wtc-color-success-soft);
+  --wtc-status-foreground: var(--wtc-color-success);
+}
+
+.wtc-status-chip--warning,
+.wtc-status-warning {
+  --wtc-status-background: var(--wtc-color-warning-soft);
+  --wtc-status-foreground: var(--wtc-color-warning);
+}
+
+.wtc-status-chip--danger,
+.wtc-status-danger {
+  --wtc-status-background: var(--wtc-color-danger-soft);
+  --wtc-status-foreground: var(--wtc-color-danger);
+}
+
+.wtc-status-chip--info,
+.wtc-status-info {
+  --wtc-status-background: var(--wtc-color-info-soft);
+  --wtc-status-foreground: var(--wtc-color-info);
+}
+
+.wtc-status-chip--neutral,
+.wtc-status-neutral {
+  --wtc-status-background: var(--wtc-color-neutral-soft);
+  --wtc-status-foreground: var(--wtc-color-text-muted);
+}
+
+/* Overlays */
+ion-modal {
+  --background: var(--wtc-color-surface);
+  --border-radius: var(--wtc-radius-xl);
+  --box-shadow: var(--wtc-shadow-raised);
+}
+
+ion-alert {
+  --background: var(--wtc-color-surface);
+  --color: var(--wtc-color-text);
+  --button-color: var(--wtc-color-primary);
+  --backdrop-opacity: 0.36;
+}
+
+ion-action-sheet {
+  --background: var(--wtc-color-surface);
+  --button-color: var(--wtc-color-text);
+  --color: var(--wtc-color-text);
+}
+
+ion-toast {
+  --background: var(--wtc-color-text);
+  --color: var(--wtc-color-surface);
+  --button-color: var(--wtc-color-primary-strong);
+  --border-radius: var(--wtc-radius-md);
+}
+
+/* Reusable page and composition patterns for later phases. */
+.wtc-page {
+  width: min(100%, var(--wtc-content-max));
+  margin: 0 auto;
+  padding: var(--wtc-space-5) var(--wtc-page-gutter) var(--wtc-space-8);
+}
+
+.wtc-section {
+  display: grid;
+  gap: var(--wtc-space-4);
+}
+
+.wtc-stack {
+  display: grid;
+  gap: var(--wtc-space-3);
+}
+
+.wtc-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--wtc-space-2);
+}
+
+.wtc-field {
+  display: grid;
+  gap: var(--wtc-space-2);
+}
+
+.wtc-field > label,
+.wtc-eyebrow {
+  color: var(--wtc-color-text-muted);
+  font-size: var(--wtc-font-size-xs);
+  font-weight: 700;
+  letter-spacing: var(--wtc-letter-spacing-label);
+  line-height: var(--wtc-line-height-tight);
+  text-transform: uppercase;
+}
+
+.wtc-title-display {
+  margin: 0;
+  color: var(--wtc-color-text);
+  font-size: clamp(var(--wtc-font-size-2xl), 7vw, var(--wtc-font-size-display));
+  font-weight: 750;
+  letter-spacing: var(--wtc-letter-spacing-tight);
+  line-height: var(--wtc-line-height-tight);
+}
+
+.wtc-empty-state {
+  display: grid;
+  justify-items: center;
+  gap: var(--wtc-space-2);
+  padding: var(--wtc-space-8) var(--wtc-space-5);
+  color: var(--wtc-color-text-muted);
+  text-align: center;
+}
+
+/* Phase 2 mobile shell: these utilities deliberately add consistency without
+ * changing how a route fetches, saves, or scopes data. */
+ion-content > .page,
+ion-content > main.page {
+  min-height: 100%;
+  padding: var(--wtc-space-5) var(--wtc-page-gutter) calc(var(--wtc-space-10) + env(safe-area-inset-bottom));
+}
+
+.page.wtc-tab-page,
+.page.wtc-direct-page {
+  margin-right: auto;
+  margin-left: auto;
+  padding: var(--wtc-space-5) var(--wtc-page-gutter) calc(var(--wtc-space-10) + env(safe-area-inset-bottom));
+}
+
+.page.wtc-tab-page:not(.wtc-page--wide),
+.page.wtc-direct-page {
+  width: min(100%, var(--wtc-content-max));
+}
+
+.page.wtc-page--wide {
+  max-width: 62rem;
+}
+
+.wtc-state {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: var(--wtc-space-3);
+  min-height: 13rem;
+  margin: var(--wtc-space-3) 0;
+  padding: var(--wtc-space-6) var(--wtc-space-5);
+  border: 1px solid var(--wtc-color-border);
+  border-radius: var(--wtc-radius-lg);
+  background: var(--wtc-color-surface);
+  color: var(--wtc-color-text-muted);
+  text-align: center;
+}
+
+.wtc-state--loading {
+  background: var(--wtc-color-surface-raised);
+}
+
+.wtc-state--empty {
+  border-style: dashed;
+  background: var(--wtc-color-surface-raised);
+}
+
+.wtc-state--error {
+  border-color: var(--wtc-color-danger);
+  background: var(--wtc-color-danger-soft);
+}
+
+.wtc-state--compact {
+  min-height: auto;
+  padding: var(--wtc-space-4);
+}
+
+.wtc-state ion-spinner {
+  width: 2rem;
+  height: 2rem;
+  color: var(--wtc-color-primary);
+}
+
+.wtc-state__icon {
+  color: var(--wtc-color-primary);
+  font-size: 2rem;
+}
+
+.wtc-state--error .wtc-state__icon {
+  color: var(--wtc-color-danger);
+}
+
+.wtc-state h2,
+.wtc-state p {
+  margin: 0;
+}
+
+.wtc-state h2 {
+  font-size: var(--wtc-font-size-lg);
+}
+
+.wtc-state p {
+  max-width: 28rem;
+}
+
+@media (min-width: 48rem) {
+  :root {
+    --wtc-page-gutter: 1.5rem;
+  }
+
+  .wtc-page {
+    padding-top: var(--wtc-space-6);
+    padding-bottom: var(--wtc-space-10);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

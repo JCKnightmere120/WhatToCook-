@@ -21,6 +21,8 @@
 .spinner { display: block; margin: 36px auto; }
 .planner-heading { margin-bottom: 14px; }
 .planner-heading .intro { margin-top: 0; }
+.planner-heading__copy h1 { margin: 2px 0 6px; font-size: 30px; letter-spacing: -0.6px; }
+.eyebrow { margin: 0; color: #5f7e64; font-size: 11px; font-weight: 800; letter-spacing: 1.1px; }
 
 .context-picker {
   margin: 0;
@@ -45,6 +47,10 @@
   color: #263a31;
   font-weight: 700;
 }
+
+.week-actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 0 0 16px; padding: 10px 12px; border-radius: 10px; background: #f1f7f0; color: #49634f; font-size: 13px; }
+.week-actions p { display: flex; align-items: center; gap: 6px; margin: 0; }
+.week-actions ion-button { flex: 0 0 auto; margin: 0; }
 
 .week {
   display: grid;
@@ -100,6 +106,10 @@
 .planned strong,
 .planned small { display: block; }
 .planned small { margin-top: 3px; color: #607067; font-size: 11px; }
+.readiness { display: inline-flex; align-items: center; gap: 3px; margin-top: 9px; font-size: 11px; font-weight: 700; }
+.readiness--ready, .readiness--cooked { color: #287340; }
+.readiness--attention { color: #a45b0c; }
+.readiness--unavailable { color: #718076; }
 
 .add {
   border: 1px dashed #aab8ad;
@@ -119,4 +129,5 @@
 @media (max-width: 640px) {
   .page { padding: 12px; }
   .week { grid-template-columns: repeat(7, minmax(136px, 1fr)); }
+  .week-actions { align-items: flex-start; }
 }

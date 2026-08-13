@@ -28,6 +28,32 @@ describe('PantryPage', () => {
   it('should create', () => {
     expect(component).toBeTruthy();
   });
+
+  it('requires a final review before adding a complete pantry item', () => {
+    component.form.name = 'Eggs';
+    component.form.quantity = '12';
+    component.form.unit = 'pieces';
+
+    component.requestSavePantryItem();
+
+    expect(component.confirmingPantryAdd).toBeTrue();
+  });
+
+  it('filters pantry items by search and category while retaining freshness state', () => {
+    const eggs: any = { id: 1, name: 'Eggs', quantity: '1', unit: 'pieces', freshness_status: 'fresh' };
+    const rice: any = { id: 2, name: 'Rice', quantity: '2', unit: 'kg', freshness_status: 'fresh' };
+    const spinach: any = { id: 3, name: 'Spinach', quantity: '1', unit: 'pack', freshness_status: 'review' };
+    component.personalItems = [eggs, rice, spinach];
+    component.selectedCategory = 'Protein';
+
+    expect(component.filteredItems(component.personalItems)).toEqual([eggs]);
+    expect(component.stockLabel(eggs)).toBe('Low stock');
+    expect(component.stockLabel(spinach)).toBe('Expiring soon');
+
+    component.selectedCategory = 'All';
+    component.pantrySearch = 'rice';
+    expect(component.filteredItems(component.personalItems)).toEqual([rice]);
+  });
 });
 
 describe('receiptCandidates', () => {

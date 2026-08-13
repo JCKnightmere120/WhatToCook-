@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\FamilyMember;
 use App\Models\MealPlan;
+use App\Models\PantryItem;
+use App\Models\ShoppingList;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -52,6 +54,27 @@ class SecurityApiTest extends TestCase
 
         $this->actingAs($member, 'sanctum')->getJson('/api/meal-plans')->assertOk()->assertJsonCount(0);
         $this->actingAs($member, 'sanctum')->deleteJson("/api/meal-plans/{$plan->id}")->assertForbidden();
+    }
+
+    public function test_removed_members_cannot_access_previous_household_pantry_or_shopping_list(): void
+    {
+        $owner = User::factory()->create();
+        $member = User::factory()->create();
+        $family = $this->actingAs($owner, 'sanctum')->postJson('/api/families', ['name' => 'Scoped'])->json();
+        FamilyMember::create(['family_id' => $family['id'], 'user_id' => $member->id, 'role' => 'member', 'status' => 'accepted']);
+        $pantry = PantryItem::create([
+            'user_id' => $owner->id, 'family_id' => $family['id'], 'name' => 'Rice',
+            'quantity' => '1', 'quantity_value' => 1, 'unit' => 'kg', 'freshness_status' => 'fresh',
+        ]);
+        $shopping = ShoppingList::create([
+            'user_id' => $owner->id, 'family_id' => $family['id'], 'ingredient_name' => 'Rice', 'quantity' => '1', 'unit' => 'kg',
+        ]);
+        FamilyMember::where(['family_id' => $family['id'], 'user_id' => $member->id])->delete();
+
+        $this->actingAs($member, 'sanctum')->getJson("/api/pantry?family_id={$family['id']}")->assertForbidden();
+        $this->actingAs($member, 'sanctum')->deleteJson("/api/pantry/{$pantry->id}")->assertNotFound();
+        $this->actingAs($member, 'sanctum')->getJson('/api/shopping-list')->assertOk()->assertJsonCount(0);
+        $this->actingAs($member, 'sanctum')->deleteJson("/api/shopping-list/{$shopping->id}")->assertForbidden();
     }
 
     private function recipeId(User $user): int

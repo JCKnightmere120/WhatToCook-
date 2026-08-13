@@ -1,7 +1,18 @@
-<ion-tabs><ion-tab-bar slot="bottom">
-  <ion-tab-button tab="dashboard" href="/tabs/dashboard"><ion-icon aria-hidden="true" name="home-outline"></ion-icon><ion-label>Home</ion-label></ion-tab-button>
-  <ion-tab-button tab="pantry" href="/tabs/pantry"><ion-icon aria-hidden="true" name="basket-outline"></ion-icon><ion-label>Pantry</ion-label></ion-tab-button>
-  <ion-tab-button tab="meal-plan" href="/tabs/meal-plan"><ion-icon aria-hidden="true" name="calendar-outline"></ion-icon><ion-label>Plan</ion-label></ion-tab-button>
-  <ion-tab-button tab="recipes" href="/tabs/recipes"><ion-icon aria-hidden="true" name="restaurant-outline"></ion-icon><ion-label>Recipes</ion-label></ion-tab-button>
-  <ion-tab-button tab="more" href="/tabs/more"><ion-icon aria-hidden="true" name="menu-outline"></ion-icon><ion-label>More</ion-label></ion-tab-button>
-</ion-tab-bar></ion-tabs>
+<ion-tabs class="wtc-tabs-shell" (ionTabsDidChange)="onTabChanged($event)">
+  <ion-header slot="top" class="wtc-shell-header">
+    <ion-toolbar>
+      <ion-title>
+        <span class="wtc-shell-header__brand">WhatToCook</span>
+        <span class="wtc-shell-header__page">{{ activeTabTitle }}</span>
+      </ion-title>
+    </ion-toolbar>
+  </ion-header>
+
+  <ion-tab-bar slot="bottom" aria-label="Primary navigation">
+    <ion-tab-button tab="dashboard" href="/tabs/dashboard" aria-label="Home"><ion-icon aria-hidden="true" name="home-outline"></ion-icon><ion-label>Home</ion-label></ion-tab-button>
+    <ion-tab-button tab="pantry" href="/tabs/pantry" aria-label="Pantry"><ion-icon aria-hidden="true" name="basket-outline"></ion-icon><ion-label>Pantry</ion-label></ion-tab-button>
+    <ion-tab-button tab="meal-plan" href="/tabs/meal-plan" aria-label="Meal plan"><ion-icon aria-hidden="true" name="calendar-outline"></ion-icon><ion-label>Plan</ion-label></ion-tab-button>
+    <ion-tab-button tab="recipes" href="/tabs/recipes" aria-label="Recipes"><ion-icon aria-hidden="true" name="restaurant-outline"></ion-icon><ion-label>Recipes</ion-label></ion-tab-button>
+    <ion-tab-button tab="more" href="/tabs/more" aria-label="More"><ion-icon aria-hidden="true" name="menu-outline"></ion-icon><ion-label>More</ion-label></ion-tab-button>
+  </ion-tab-bar>
+</ion-tabs>

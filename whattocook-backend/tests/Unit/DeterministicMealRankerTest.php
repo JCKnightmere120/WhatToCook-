@@ -38,6 +38,18 @@ class DeterministicMealRankerTest extends TestCase
         $this->assertSame($expiry->id, $first->first()->id); $this->assertSame($other->id, $second->first()->id);
     }
 
+    public function test_halal_taxonomy_excludes_pork_and_alcohol_when_generating(): void
+    {
+        $user = User::factory()->create();
+        $safe = $this->recipe($user, 'Vegetable Soup', 'squash', 20);
+        $this->recipe($user, 'Pork Stew', 'pork belly', 20);
+        $this->recipe($user, 'Wine Sauce', 'cooking wine', 20);
+        $profile = new Profile(['dietary_restrictions' => ['halal']]);
+
+        $ranked = app(DeterministicMealRanker::class)->rank(Recipe::with('ingredients')->get(), collect([$profile]), collect(), collect(), ['cooking_time_budget' => '30'], []);
+        $this->assertSame([$safe->id], $ranked->pluck('id')->all());
+    }
+
     private function recipe(User $user, string $name, string $ingredient, int $minutes): Recipe
     {
         $recipe = Recipe::create(['name' => $name, 'instructions' => 'Cook.', 'prep_time' => 0, 'cook_time' => $minutes, 'servings' => 1, 'protein' => 20, 'created_by' => $user->id]);

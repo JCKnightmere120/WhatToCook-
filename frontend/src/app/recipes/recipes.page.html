@@ -1,9 +1,76 @@
-<ion-header><ion-toolbar><ion-title>Discover recipes</ion-title><ion-buttons slot="end"><ion-button (click)="loadRecipeDiscovery()" aria-label="Refresh recipes"><ion-icon name="refresh-outline"></ion-icon></ion-button></ion-buttons></ion-toolbar></ion-header>
-<ion-content><div class="page">
-  <section class="cooking-scope"><ion-item lines="none"><ion-icon name="restaurant-outline" slot="start"></ion-icon><ion-select label="Cooking with" labelPlacement="stacked" [(ngModel)]="cookingScope" (ionChange)="changeCookingScope()"><ion-select-option value="personal">My personal pantry</ion-select-option><ion-select-option *ngFor="let family of families" [value]="family.id">{{ family.name }} shared pantry</ion-select-option></ion-select></ion-item><p>{{ cookingScopeDescription }}</p></section>
-  <ion-item class="search" lines="none"><ion-icon name="search-outline" slot="start"></ion-icon><ion-input label="Search a dish or ingredient" labelPlacement="stacked" [(ngModel)]="searchTerm" (ngModelChange)="onSearchChanged()" [clearInput]="true"></ion-input></ion-item>
-  <section class="filters"><ion-item><ion-select label="Meal" [(ngModel)]="mealType" (ionChange)="applyFilters()"><ion-select-option value="">Any meal</ion-select-option><ion-select-option value="breakfast">Breakfast</ion-select-option><ion-select-option value="lunch">Lunch</ion-select-option><ion-select-option value="dinner">Dinner</ion-select-option></ion-select></ion-item><ion-item><ion-select label="Difficulty" [(ngModel)]="difficulty" (ionChange)="applyFilters()"><ion-select-option value="">Any level</ion-select-option><ion-select-option value="easy">Easy</ion-select-option><ion-select-option value="medium">Medium</ion-select-option><ion-select-option value="hard">Hard</ion-select-option></ion-select></ion-item><ion-item><ion-select label="Total time" [(ngModel)]="maxTime" (ionChange)="applyFilters()"><ion-select-option [value]="undefined">Any time</ion-select-option><ion-select-option [value]="30">30 min or less</ion-select-option><ion-select-option [value]="60">1 hour or less</ion-select-option></ion-select></ion-item></section>
-  <p class="message" *ngIf="message">{{ message }}</p><ion-spinner *ngIf="loading" class="spinner"></ion-spinner><p class="search-error" *ngIf="searchError">{{ searchError }}</p>
-  <ng-container *ngIf="!loading && !searchError"><ion-card *ngFor="let item of recipes"><img class="recipe-image" [src]="recipeImage(item)" [alt]="item.recipe.name" (error)="useFallbackImage($event)"><ion-card-header><div class="score">{{ item.match_percentage }}% pantry match</div><ion-card-title>{{ item.recipe.name }}</ion-card-title><ion-card-subtitle>{{ item.recipe.servings || 2 }} servings · {{ (item.recipe.prep_time || 0) + (item.recipe.cook_time || 0) }} min<span *ngIf="item.recipe.difficulty"> · {{ item.recipe.difficulty }}</span></ion-card-subtitle></ion-card-header><ion-card-content><p *ngIf="item.recipe.image_attribution" class="attribution">Image: <a *ngIf="item.recipe.image_source_url; else plainAttribution" [href]="item.recipe.image_source_url" target="_blank" rel="noopener">{{ item.recipe.image_attribution }}</a><ng-template #plainAttribution>{{ item.recipe.image_attribution }}</ng-template></p><p *ngIf="item.missing_ingredients.length"><strong>Still needed:</strong> <span *ngFor="let ingredient of item.missing_ingredients; let last = last">{{ ingredient.name }}{{ last ? '' : ', ' }}</span></p><p *ngIf="!item.missing_ingredients.length && !item.needs_review_ingredients?.length" class="ready">You have everything you need.</p><ion-button fill="outline" size="small" (click)="showRecipeDetails(item)">View recipe</ion-button><ion-button *ngIf="item.missing_ingredients.length" fill="outline" size="small" (click)="addMissingIngredientsToShoppingList(item)">Add missing to list</ion-button><ion-button fill="clear" size="small" (click)="toggleFavorite(item)"><ion-icon [name]="favorites.has(item.recipe.id) ? 'heart' : 'heart-outline'"></ion-icon>{{ favorites.has(item.recipe.id) ? 'Saved' : 'Save' }}</ion-button></ion-card-content></ion-card><section class="empty-search" *ngIf="!recipes.length"><ion-icon name="restaurant-outline"></ion-icon><h2>No safe recipes found</h2><p>Try changing the filters or search terms.</p></section><ion-button *ngIf="hasMore" expand="block" fill="outline" (click)="loadMore()" [disabled]="loadingMore">{{ loadingMore ? 'Loading…' : 'Load more recipes' }}</ion-button></ng-container>
-</div></ion-content>
+<ion-content>
+  <main class="page wtc-tab-page recipe-discovery">
+    <header class="discovery-header">
+      <div>
+        <p class="wtc-eyebrow">Cook from what you have</p>
+        <h1>Discover recipes</h1>
+        <p>Find dishes that fit your pantry, time, and cooking mood.</p>
+      </div>
+      <ion-button fill="clear" (click)="loadRecipeDiscovery()" aria-label="Refresh recipes" title="Refresh recipes">
+        <ion-icon name="refresh-outline" slot="icon-only"></ion-icon>
+      </ion-button>
+    </header>
+
+    <section class="cooking-scope" aria-label="Cooking pantry">
+      <ion-item lines="none">
+        <ion-icon name="restaurant-outline" slot="start" aria-hidden="true"></ion-icon>
+        <ion-select label="Cooking with" labelPlacement="stacked" [(ngModel)]="cookingScope" (ionChange)="changeCookingScope()">
+          <ion-select-option value="personal">My personal pantry</ion-select-option>
+          <ion-select-option *ngFor="let family of families" [value]="family.id">{{ family.name }} shared pantry</ion-select-option>
+        </ion-select>
+      </ion-item>
+      <p>{{ cookingScopeDescription }}</p>
+    </section>
+
+    <section class="recipe-search" aria-label="Search and filter recipes">
+      <ion-item class="search" lines="none">
+        <ion-icon name="search-outline" slot="start" aria-hidden="true"></ion-icon>
+        <ion-input label="Search a dish or ingredient" labelPlacement="stacked" [(ngModel)]="searchTerm" (ngModelChange)="onSearchChanged()" [clearInput]="true"></ion-input>
+      </ion-item>
+      <div class="filters">
+        <ion-item><ion-select label="Meal" [(ngModel)]="mealType" (ionChange)="applyFilters()"><ion-select-option value="">Any meal</ion-select-option><ion-select-option value="breakfast">Breakfast</ion-select-option><ion-select-option value="lunch">Lunch</ion-select-option><ion-select-option value="dinner">Dinner</ion-select-option></ion-select></ion-item>
+        <ion-item><ion-select label="Difficulty" [(ngModel)]="difficulty" (ionChange)="applyFilters()"><ion-select-option value="">Any level</ion-select-option><ion-select-option value="easy">Easy</ion-select-option><ion-select-option value="medium">Medium</ion-select-option><ion-select-option value="hard">Hard</ion-select-option></ion-select></ion-item>
+        <ion-item><ion-select label="Total time" [(ngModel)]="maxTime" (ionChange)="applyFilters()"><ion-select-option [value]="undefined">Any time</ion-select-option><ion-select-option [value]="30">30 min or less</ion-select-option><ion-select-option [value]="60">1 hour or less</ion-select-option></ion-select></ion-item>
+      </div>
+    </section>
+
+    <p class="message" *ngIf="message" role="status">{{ message }}</p>
+
+    <section *ngIf="loading" class="wtc-state wtc-state--loading" role="status" aria-live="polite">
+      <ion-spinner aria-label="Loading recipes"></ion-spinner><h2>Finding recipes for you</h2><p>Checking your pantry and active filters.</p>
+    </section>
+    <section *ngIf="!loading && searchError" class="wtc-state wtc-state--error" role="alert">
+      <ion-icon class="wtc-state__icon" name="alert-circle-outline" aria-hidden="true"></ion-icon><h2>Recipes are unavailable</h2><p>{{ searchError }}</p><ion-button fill="outline" (click)="loadRecipeDiscovery()">Try again</ion-button>
+    </section>
+
+    <ng-container *ngIf="!loading && !searchError">
+      <section class="recipe-results" aria-label="Recipe results">
+        <article class="recipe-card" *ngFor="let item of recipes">
+          <button class="recipe-card__image-button" type="button" (click)="showRecipeDetails(item)" [attr.aria-label]="'View ' + item.recipe.name">
+            <img class="recipe-image" [src]="recipeImage(item)" [alt]="item.recipe.name" (error)="useFallbackImage($event)">
+            <ion-badge class="match-badge"><ion-icon name="leaf-outline" aria-hidden="true"></ion-icon>{{ item.match_percentage }}% match</ion-badge>
+          </button>
+          <div class="recipe-card__body">
+            <div class="recipe-card__title-row">
+              <div><p class="recipe-card__type" *ngIf="item.recipe.meal_type">{{ item.recipe.meal_type }}</p><h2>{{ item.recipe.name }}</h2></div>
+              <ion-button fill="clear" size="small" (click)="toggleFavorite(item)" [attr.aria-label]="(favorites.has(item.recipe.id) ? 'Remove ' : 'Save ') + item.recipe.name">
+                <ion-icon slot="icon-only" [name]="favorites.has(item.recipe.id) ? 'heart' : 'heart-outline'"></ion-icon>
+              </ion-button>
+            </div>
+            <div class="recipe-meta"><span><ion-icon name="time-outline" aria-hidden="true"></ion-icon>{{ (item.recipe.prep_time || 0) + (item.recipe.cook_time || 0) }} min</span><span><ion-icon name="people-outline" aria-hidden="true"></ion-icon>{{ item.recipe.servings || 2 }} servings</span><span *ngIf="item.recipe.difficulty"><ion-icon name="flame-outline" aria-hidden="true"></ion-icon>{{ item.recipe.difficulty }}</span></div>
+            <p class="recipe-card__description" *ngIf="item.recipe.description">{{ item.recipe.description }}</p>
+            <p *ngIf="item.missing_ingredients.length" class="ingredient-status ingredient-status--missing"><ion-icon name="basket-outline" aria-hidden="true"></ion-icon><span><strong>Still needed:</strong> <ng-container *ngFor="let ingredient of item.missing_ingredients; let last = last">{{ ingredient.name }}{{ last ? '' : ', ' }}</ng-container></span></p>
+            <p *ngIf="item.needs_review_ingredients?.length" class="ingredient-status ingredient-status--review"><ion-icon name="help-circle-outline" aria-hidden="true"></ion-icon><span>Confirm {{ item.needs_review_ingredients?.length }} pantry item{{ item.needs_review_ingredients?.length === 1 ? '' : 's' }} to improve this match.</span></p>
+            <p *ngIf="!item.missing_ingredients.length && !item.needs_review_ingredients?.length" class="ingredient-status ingredient-status--ready"><ion-icon name="checkmark-circle-outline" aria-hidden="true"></ion-icon>You have everything you need.</p>
+            <p *ngIf="item.recipe.image_attribution" class="attribution">Image: <a *ngIf="item.recipe.image_source_url; else plainAttribution" [href]="item.recipe.image_source_url" target="_blank" rel="noopener">{{ item.recipe.image_attribution }}</a><ng-template #plainAttribution>{{ item.recipe.image_attribution }}</ng-template></p>
+            <div class="recipe-card__actions"><ion-button size="small" (click)="showRecipeDetails(item)">View recipe</ion-button><ion-button *ngIf="item.missing_ingredients.length" fill="outline" size="small" (click)="addMissingIngredientsToShoppingList(item)">Add to list</ion-button><ion-button *ngIf="item.needs_review_ingredients?.[0]?.package_items?.length" fill="clear" size="small" (click)="openPackageConfirmation(item.needs_review_ingredients![0])">Confirm pantry item</ion-button></div>
+          </div>
+        </article>
+      </section>
+      <section class="wtc-state wtc-state--empty" *ngIf="!recipes.length"><ion-icon class="wtc-state__icon" name="restaurant-outline" aria-hidden="true"></ion-icon><h2>No safe recipes found</h2><p>Try changing the filters or search terms.</p></section>
+      <ion-button class="load-more" *ngIf="hasMore" expand="block" fill="outline" (click)="loadMore()" [disabled]="loadingMore">{{ loadingMore ? 'Loading…' : 'Load more recipes' }}</ion-button>
+    </ng-container>
+  </main>
+</ion-content>
+
 <ion-modal [isOpen]="!!confirmingPackage" (didDismiss)="closePackageConfirmation()"><ng-template><ion-header><ion-toolbar><ion-title>Confirm package amount</ion-title><ion-buttons slot="end"><ion-button (click)="closePackageConfirmation()">Close</ion-button></ion-buttons></ion-toolbar></ion-header><ion-content class="ion-padding"><p>You have {{ confirmingPackage?.quantity }} {{ confirmingPackage?.unit }} of {{ confirmingPackage?.name }}. How much is in one {{ confirmingPackage?.unit }}?</p><ion-item><ion-input label="Amount in one package" labelPlacement="stacked" type="number" min="0.001" [(ngModel)]="packageAmount"></ion-input></ion-item><ion-item><ion-select label="Unit" labelPlacement="stacked" [(ngModel)]="packageUnit"><ion-select-option value="g">grams (g)</ion-select-option><ion-select-option value="ml">millilitres (ml)</ion-select-option><ion-select-option value="pieces">pieces</ion-select-option></ion-select></ion-item><ion-button expand="block" (click)="savePackageConversion()" [disabled]="!packageAmount || savingConversion">Save conversion</ion-button></ion-content></ng-template></ion-modal>

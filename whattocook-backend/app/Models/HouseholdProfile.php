@@ -28,6 +28,11 @@ class HouseholdProfile extends Model
         'visible_to_family',
     ];
 
+    /** Sensitive dietary and health fields are private unless explicitly shared. */
+    protected $attributes = [
+        'visible_to_family' => '{"health_conditions":false,"allergies":false,"dietary_restrictions":false,"likes":false,"dislikes":false}',
+    ];
+
     protected function casts(): array
     {
         return [
@@ -51,6 +56,23 @@ class HouseholdProfile extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Dependents remain selectable, while account-linked diners must still be
+     * accepted household members. This prevents a removed account's stale
+     * profile from being used in a plan.
+     */
+    public function scopeSelectableForFamily($query, int $familyId)
+    {
+        return $query->where('family_id', $familyId)->where(function ($profiles) use ($familyId) {
+            $profiles->whereNull('user_id')->orWhereExists(function ($members) use ($familyId) {
+                $members->selectRaw('1')->from('family_members')
+                    ->whereColumn('family_members.user_id', 'household_profiles.user_id')
+                    ->where('family_members.family_id', $familyId)
+                    ->where('family_members.status', 'accepted');
+            });
+        });
     }
 
     /** The API derives this from the stored date; clients never submit an age. */

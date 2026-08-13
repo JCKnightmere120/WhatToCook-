@@ -8,6 +8,7 @@ use App\Models\Recipe;
 use App\Models\ShoppingList;
 use App\Services\RecipeMatcher;
 use App\Services\ConfirmedPurchaseService;
+use App\Services\ShoppingListAggregationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -23,21 +24,11 @@ class ShoppingListController extends Controller
     {
         $data = $this->data($request);
 
-        $existing = ShoppingList::where('user_id', $request->user()->id)
-            ->where('family_id', $data['family_id'] ?? null)
-            ->where('is_purchased', false)
-            ->whereRaw('LOWER(ingredient_name) = ?', [strtolower($data['ingredient_name'])])
-            ->whereRaw('LOWER(COALESCE(unit, \'\')) = ?', [strtolower($data['unit'] ?? '')])
-            ->first();
-        if ($existing) {
-            if (is_numeric($existing->quantity) && is_numeric($data['quantity'] ?? null)) {
-                $existing->update(['quantity' => (string) round((float) $existing->quantity + (float) $data['quantity'], 3)]);
-            }
+        $item = app(ShoppingListAggregationService::class)->add(
+            $request->user()->id, $data['family_id'] ?? null, $data['ingredient_name'], $data['quantity'] ?? null, $data['unit'] ?? null,
+        );
 
-            return response()->json($existing->fresh());
-        }
-
-        return response()->json(ShoppingList::create($data + ['user_id' => $request->user()->id]), 201);
+        return response()->json($item, $item->wasRecentlyCreated ? 201 : 200);
     }
 
     public function update(Request $request, ShoppingList $shoppingList)
@@ -80,7 +71,7 @@ class ShoppingListController extends Controller
         return response()->noContent();
     }
 
-    public function generate(Request $request, Recipe $recipe, RecipeMatcher $matcher)
+    public function generate(Request $request, Recipe $recipe, RecipeMatcher $matcher, ShoppingListAggregationService $shopping)
     {
         $familyId = $request->validate(['family_id' => 'nullable|integer|exists:families,id'])['family_id'] ?? null;
         $this->canUseFamily($request, $familyId);
@@ -90,31 +81,9 @@ class ShoppingListController extends Controller
             ->whereIn('freshness_status', ['fresh', 'review'])
             ->get();
         $match = $matcher->match($recipe->load('ingredients'), $pantry);
-        $created = collect($match['missing_ingredients'])->map(function ($ingredient) use ($request, $familyId) {
+        $created = collect($match['missing_ingredients'])->map(function ($ingredient) use ($request, $familyId, $shopping) {
             $quantity = $ingredient['missing_quantity'] ?? $ingredient['quantity'];
-            $existing = ShoppingList::where('user_id', $request->user()->id)
-                ->where('family_id', $familyId)
-                ->where('is_purchased', false)
-                ->whereRaw('LOWER(ingredient_name) = ?', [strtolower($ingredient['name'])])
-                ->whereRaw('LOWER(COALESCE(unit, \'\')) = ?', [strtolower($ingredient['unit'] ?? '')])
-                ->first();
-
-            if ($existing) {
-                if (is_numeric($quantity) && is_numeric($existing->quantity)) {
-                    $existing->update(['quantity' => (string) round((float) $existing->quantity + (float) $quantity, 3)]);
-                }
-
-                return $existing->fresh();
-            }
-
-            return ShoppingList::create([
-                'user_id' => $request->user()->id,
-                'family_id' => $familyId,
-                'ingredient_name' => $ingredient['name'],
-                'quantity' => $quantity,
-                'unit' => $ingredient['unit'],
-                'is_purchased' => false,
-            ]);
+            return $shopping->add($request->user()->id, $familyId, $ingredient['name'], $quantity, $ingredient['unit'] ?? null);
         });
 
         return response()->json(['items' => $created->values(), 'message' => 'Missing ingredients added to your shopping list.'], 201);

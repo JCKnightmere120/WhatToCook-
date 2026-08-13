@@ -47,4 +47,17 @@ npm run build
 npm test -- --watch=false --browsers=ChromeHeadless
 ```
 
-See [SETUP_GUIDE.md](SETUP_GUIDE.md), [TESTING_GUIDE.md](TESTING_GUIDE.md), [ERD.md](ERD.md), [CAPSTONE_DEMO_CHECKLIST.md](CAPSTONE_DEMO_CHECKLIST.md), and [the backend guide](whattocook-backend/README.md) for the full delivery package.
+See [SETUP_GUIDE.md](SETUP_GUIDE.md), [TESTING_GUIDE.md](TESTING_GUIDE.md), [ERD.md](ERD.md), [CAPSTONE_DEMO_CHECKLIST.md](CAPSTONE_DEMO_CHECKLIST.md), and [the backend guide](../whattocook-backend/README.md) for the full delivery package.
+
+## Documentation index
+
+- [Setup guide](SETUP_GUIDE.md) — local development and release preparation.
+- [Deployment guide](DEPLOYMENT_GUIDE.md) — production architecture, release, rollback, and security checks.
+- [Testing guide](TESTING_GUIDE.md) — automated, Android, and panel verification.
+- [Cooking mode specification](COOKING_MODE_SPEC.md) — current guided-cooking route, client behavior, and API contract.
+- [System logic map](SYSTEM_LOGIC_MAP.md) — active-context, matching, planning, and completion rules.
+- [Product roadmap](PRODUCT_ROADMAP.md) and [implementation plan](IMPLEMENTATION_PLAN.md) — delivered scope and phased direction.
+- [Functionality details](FUNCTIONALITY_DETAILS.md) and [must-haves](MustToHaves.md) — project requirements and feature intent.
+- [ERD](ERD.md) — schema reference and visual diagram.
+- [Capstone demo checklist](CAPSTONE_DEMO_CHECKLIST.md) — presentation readiness checklist.
+- [Phase 1 baseline](phase-1-baseline.md) — dependency and database baseline record.

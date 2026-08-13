@@ -1,5 +1,5 @@
 .page {
-  max-width: 720px;
+  max-width: 780px;
   margin: 0 auto;
   padding: 16px;
 }
@@ -12,6 +12,60 @@
 .intro {
   margin: 0 0 16px;
 }
+
+.setup-hero {
+  margin: 8px 4px 24px;
+
+  span,
+  .progress-card span {
+    color: var(--wtc-color-primary);
+    font-size: .72rem;
+    font-weight: 800;
+    letter-spacing: .12em;
+  }
+
+  h1 { margin: 6px 0 8px; font-size: clamp(2rem, 7vw, 2.7rem); }
+  p { margin: 0; max-width: 560px; }
+}
+
+.week-length { --padding-start: 0; --inner-padding-end: 0; }
+.choice-grid { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 0; }
+.choice-grid button {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid var(--wtc-color-border-strong);
+  border-radius: var(--wtc-radius-md);
+  background: transparent;
+  color: var(--wtc-color-text);
+  font: inherit;
+  font-size: .88rem;
+  font-weight: 700;
+}
+.choice-grid button.selected { border-color: var(--wtc-color-primary); background: var(--wtc-color-primary-soft); color: var(--wtc-color-primary-strong); }
+.preference-label h2, .preference-label p { margin: 0; }
+.preference-label p { font-size: .88rem; }
+
+.generate-card {
+  margin: 20px 0;
+  padding: 20px;
+  border: 1px solid var(--wtc-color-border);
+  border-radius: var(--wtc-radius-lg);
+  background: var(--wtc-color-surface-muted);
+
+  h2, p { margin: 0; }
+  ion-button { margin: 16px 0 0; }
+}
+
+.progress-card { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: center; }
+.progress-card ion-spinner { width: 32px; height: 32px; color: var(--wtc-color-primary); }
+.progress-card span { color: var(--wtc-color-primary); font-size: .72rem; font-weight: 800; letter-spacing: .12em; }
+.progress-steps { grid-column: 1 / -1; display: flex; align-items: center; gap: 7px; }
+.progress-steps b { display: grid; width: 24px; height: 24px; place-items: center; border: 1px solid var(--wtc-color-border-strong); border-radius: 50%; color: var(--wtc-color-text-muted); font-size: .75rem; }
+.progress-steps b.complete { border-color: var(--wtc-color-primary); background: var(--wtc-color-primary); color: #fff; }
+.progress-steps i { height: 2px; flex: 1; background: var(--wtc-color-border-strong); }
 
 .message {
   margin: 0 0 12px;

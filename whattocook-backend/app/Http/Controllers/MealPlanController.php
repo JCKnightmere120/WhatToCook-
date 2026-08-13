@@ -8,6 +8,8 @@ use App\Models\MealHistory;
 use App\Models\MealPlan;
 use App\Models\PantryItem;
 use App\Models\Profile;
+use App\Services\FoodSafetyTaxonomy;
+use App\Services\ChildMealPlanner;
 use App\Models\Recipe;
 use App\Models\ShoppingList;
 use App\Services\RecipeNutritionService;
@@ -19,6 +21,10 @@ use Illuminate\Validation\ValidationException;
 
 class MealPlanController extends Controller
 {
+    public function __construct(
+        private readonly FoodSafetyTaxonomy $foodSafety,
+        private readonly ChildMealPlanner $childPlanner,
+    ) {}
     public function nutritionSummary(Request $request, RecipeNutritionService $nutrition)
     {
         $filters = $request->validate([
@@ -48,13 +54,31 @@ class MealPlanController extends Controller
                 $totals[$key] += $amount;
                 $byDate[$date][$key] += $amount;
             }
-            if (! $recipeNutrition['is_complete']) {
-                $incomplete[] = ['meal_plan_id' => $plan->id, 'recipe_id' => $plan->recipe_id, 'unmatched_ingredients' => $recipeNutrition['unmatched_ingredients']];
+            // A plan total is only safe to call complete when every included
+            // ingredient and every displayed nutrient is covered.  A food can
+            // be linked and measurable while still lacking (for example)
+            // sodium or fibre in its source record.
+            if (! $recipeNutrition['is_nutrition_complete']) {
+                $incomplete[] = [
+                    'meal_plan_id' => $plan->id,
+                    'recipe_id' => $plan->recipe_id,
+                    'data_status' => $recipeNutrition['data_status'],
+                    'unmatched_ingredients' => $recipeNutrition['unmatched_ingredients'],
+                    'unknown_nutrients' => $recipeNutrition['unknown_nutrients'],
+                ];
             }
         }
         $round = fn (array $values) => collect($values)->map(fn ($value) => round($value, 2))->all();
 
-        return response()->json(['meal_count' => $plans->count(), 'totals' => $round($totals), 'by_date' => collect($byDate)->map($round), 'incomplete_meals' => $incomplete]);
+        return response()->json([
+            'meal_count' => $plans->count(),
+            'totals' => $round($totals),
+            'by_date' => collect($byDate)->map($round),
+            'incomplete_meals' => $incomplete,
+            'is_nutrition_complete' => $incomplete === [],
+            'data_status' => $incomplete === [] ? 'complete' : 'incomplete',
+            'disclaimer' => 'Nutrition is an estimate from linked food records, not medical advice. Do not use incomplete totals for medical decisions.',
+        ]);
     }
 
     public function index(Request $request)
@@ -252,7 +276,7 @@ class MealPlanController extends Controller
     }
 
     /** Add only this meal's scaled shortages to its personal or shared list. */
-    public function addShortagesToShoppingList(Request $request, MealPlan $mealPlan, RecipeMatcher $matcher)
+    public function addShortagesToShoppingList(Request $request, MealPlan $mealPlan, RecipeMatcher $matcher, \App\Services\ShoppingListAggregationService $shopping)
     {
         $this->owns($request, $mealPlan);
         $this->assertSavedMeal($mealPlan);
@@ -260,22 +284,8 @@ class MealPlanController extends Controller
         $match = $matcher->match($mealPlan->recipe, $this->pantryForPlan($request, $mealPlan), $this->servingEquivalent($mealPlan));
         $ingredients = $this->preflightIngredients($match);
         $needsReview = $ingredients->where('status', 'needs_review')->values();
-        $items = $ingredients->whereIn('status', ['low_stock', 'missing'])->map(function (array $ingredient) use ($request, $mealPlan) {
-            $item = ShoppingList::firstOrNew([
-                'user_id' => $request->user()->id,
-                'family_id' => $mealPlan->family_id,
-                'ingredient_name' => $ingredient['name'],
-                'unit' => $ingredient['unit'],
-                'is_purchased' => false,
-            ]);
-            if ($item->exists && is_numeric($item->quantity)) {
-                $item->quantity = (string) round((float) $item->quantity + (float) $ingredient['missing_quantity'], 3);
-            } elseif (! $item->exists) {
-                $item->quantity = (string) $ingredient['missing_quantity'];
-            }
-            $item->save();
-
-            return $item->fresh();
+        $items = $ingredients->whereIn('status', ['low_stock', 'missing'])->map(function (array $ingredient) use ($request, $mealPlan, $shopping) {
+            return $shopping->add($request->user()->id, $mealPlan->family_id, $ingredient['name'], $ingredient['missing_quantity'], $ingredient['unit'] ?? null);
         })->values();
 
         return response()->json([
@@ -378,8 +388,18 @@ class MealPlanController extends Controller
         if (array_key_exists('diner_profile_ids', $data)) {
             $data['diner_profile_ids'] = $this->validatedDiners($familyId, $data['diner_profile_ids'] ?? []);
         }
-        if (array_key_exists('recipe_id', $data)) {
-            $isSafe = $this->safeRecipesFor($request, $familyId, $data['diner_profile_ids'] ?? $existing?->diner_profile_ids ?? [])->contains('id', $data['recipe_id']);
+        // Changing a shared meal's date or diners can change its child-safety
+        // and dietary eligibility even when the recipe itself is unchanged.
+        $mustRecheckRecipe = array_key_exists('recipe_id', $data)
+            || ($familyId && (array_key_exists('planned_date', $data) || array_key_exists('diner_profile_ids', $data)));
+        if ($mustRecheckRecipe) {
+            $recipeId = $data['recipe_id'] ?? $existing?->recipe_id;
+            $isSafe = $this->safeRecipesFor(
+                $request,
+                $familyId,
+                $data['diner_profile_ids'] ?? $existing?->diner_profile_ids ?? [],
+                Carbon::parse($data['planned_date'] ?? $existing?->planned_date ?? now()),
+            )->contains('id', $recipeId);
             if (! $isSafe) {
                 throw ValidationException::withMessages(['recipe_id' => ['This recipe conflicts with the active diner profile or dietary restrictions.']]);
             }
@@ -398,7 +418,7 @@ class MealPlanController extends Controller
             return;
         }
 
-        $userIds = HouseholdProfile::where('family_id', $familyId)
+        $userIds = HouseholdProfile::selectableForFamily($familyId)
             ->whereIn('id', $dinerIds)
             ->whereNotNull('user_id')
             ->pluck('user_id');
@@ -484,7 +504,7 @@ class MealPlanController extends Controller
             ]]);
         }
 
-        return HouseholdProfile::where('family_id', $mealPlan->family_id)
+        return HouseholdProfile::selectableForFamily($mealPlan->family_id)
             ->whereIn('id', $mealPlan->diner_profile_ids ?? [])
             ->get(['id', 'name', 'relation'])
             ->values();
@@ -521,32 +541,32 @@ class MealPlanController extends Controller
         if (! $dinerIds) {
             return [];
         }
-        if (! $familyId || HouseholdProfile::where('family_id', $familyId)->whereIn('id', $dinerIds)->count() !== count($dinerIds)) {
+        if (! $familyId || HouseholdProfile::selectableForFamily($familyId)->whereIn('id', $dinerIds)->count() !== count($dinerIds)) {
             throw ValidationException::withMessages(['diner_profile_ids' => ['Each diner must belong to the selected household.']]);
         }
 
         return $dinerIds;
     }
 
-    private function safeRecipesFor(Request $request, ?int $familyId, array $dinerIds)
+    private function safeRecipesFor(Request $request, ?int $familyId, array $dinerIds, ?Carbon $mealDate = null)
     {
-        $profiles = $familyId ? HouseholdProfile::where('family_id', $familyId)->whereIn('id', $dinerIds)->get() : collect([Profile::where('user_id', $request->user()->id)->first()]);
-        $blocked = $profiles->flatMap(function ($profile) {
-            if (! $profile) {
-                return [];
-            }
-            $values = array_map('strtolower', array_merge($profile->allergies ?? [], $profile->dietary_restrictions ?? []));
-            if (in_array('vegetarian', $values, true)) {
-                $values = [...$values, 'chicken', 'pork', 'beef', 'fish', 'seafood', 'meat'];
-            }
-            if (in_array('vegan', $values, true)) {
-                $values = [...$values, 'chicken', 'pork', 'beef', 'fish', 'seafood', 'meat', 'egg', 'milk', 'dairy'];
-            }
+        $profiles = $familyId ? HouseholdProfile::selectableForFamily($familyId)->whereIn('id', $dinerIds)->get() : collect([Profile::where('user_id', $request->user()->id)->first()]);
+        $mealDate ??= now();
+        $hasYoungChild = $profiles->filter()->contains(fn ($profile) => in_array(
+            $this->childPlanner->ageBand($profile->birth_date ?? null, $mealDate),
+            ['0-5_months', '6-11_months', '12-23_months', '2-5_years'],
+            true,
+        ));
+        return Recipe::with('ingredients')->get()
+            ->filter(fn (Recipe $recipe) => $this->foodSafety->recipeIsSafe($recipe, $profiles))
+            ->filter(fn (Recipe $recipe) => ! $hasYoungChild || ! $this->hasYoungChildConflict($recipe))
+            ->values();
+    }
 
-            return $values;
-        })->filter()->unique()->values()->all();
-
-        return Recipe::with('ingredients')->get()->filter(fn (Recipe $recipe) => ! $recipe->ingredients->contains(fn ($ingredient) => collect($blocked)->contains(fn ($blocked) => str_contains(strtolower($ingredient->name), $blocked))))->values();
+    private function hasYoungChildConflict(Recipe $recipe): bool
+    {
+        return $recipe->ingredients->pluck('name')->push($recipe->name)
+            ->contains(fn ($term) => str_contains(strtolower((string) $term), 'alcohol') || str_contains(strtolower((string) $term), 'siling labuyo'));
     }
 
     /**
@@ -556,7 +576,7 @@ class MealPlanController extends Controller
     private function rankedSafeRecipesFor(Request $request, ?int $familyId, array $dinerIds)
     {
         $profiles = $familyId
-            ? HouseholdProfile::where('family_id', $familyId)->whereIn('id', $dinerIds)->get()
+            ? HouseholdProfile::selectableForFamily($familyId)->whereIn('id', $dinerIds)->get()
             : collect([Profile::where('user_id', $request->user()->id)->first()])->filter();
         $likes = $profiles->flatMap(fn ($profile) => $profile->likes ?? [])->map(fn ($value) => strtolower($value))->filter()->unique()->values();
         $dislikes = $profiles->flatMap(fn ($profile) => $profile->dislikes ?? [])->map(fn ($value) => strtolower($value))->filter()->unique()->values();

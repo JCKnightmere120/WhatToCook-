@@ -1,7 +1,114 @@
-<ion-header><ion-toolbar><ion-title>WhatToCook?</ion-title><ion-buttons slot="end"><ion-button routerLink="/family"><ion-icon name="people-outline"></ion-icon></ion-button><ion-button (click)="loadDashboardData()"><ion-icon name="refresh-outline"></ion-icon></ion-button></ion-buttons></ion-toolbar></ion-header>
-<ion-content [fullscreen]="true"><div class="page"><section class="greeting"><p>Good day, {{ auth.user?.name || 'there' }}!</p><h1>What's happening in your kitchen today?</h1><button routerLink="/family"><ion-icon name="people-outline"></ion-icon>{{ activeFamily?.name || 'No household selected' }}<ion-icon name="chevron-down"></ion-icon></button></section>
-  <section class="pantry-section"><div class="heading"><h2>Your pantry</h2><a routerLink="/tabs/pantry">Manage</a></div><ion-card class="pantry-card"><ion-card-content><div><span>PERSONAL STOCK</span><strong>{{ personalItems.length }} items</strong><p>{{ attention(personalItems).length }} item{{ attention(personalItems).length === 1 ? '' : 's' }} need attention</p></div><ion-icon name="person-outline"></ion-icon></ion-card-content></ion-card></section>
-  <section class="pantry-section" *ngIf="activeFamily"><div class="heading"><h2>{{ activeFamily.name }} pantry</h2><a routerLink="/tabs/pantry">Manage</a></div><ion-card class="pantry-card household"><ion-card-content><div><span>SHARED HOUSEHOLD STOCK</span><strong>{{ householdItems.length }} items</strong><p>{{ attention(householdItems).length }} item{{ attention(householdItems).length === 1 ? '' : 's' }} need attention</p></div><ion-icon name="people-outline"></ion-icon></ion-card-content></ion-card></section>
-  <section class="section" *ngIf="attention(householdItems).length"><div class="heading"><h2>Household items needing attention</h2><a routerLink="/tabs/pantry">See pantry</a></div><div class="expiry-scroll"><article *ngFor="let item of attention(householdItems)"><ion-icon name="time-outline"></ion-icon><strong>{{ item.name }}</strong><span>{{ item.expiry_date | date:'MMM d' }}</span><small>Shared</small></article></div></section>
-  <section class="section" *ngIf="attention(personalItems).length"><div class="heading"><h2>Your items needing attention</h2><a routerLink="/tabs/pantry">See pantry</a></div><div class="expiry-scroll"><article *ngFor="let item of attention(personalItems)"><ion-icon name="time-outline"></ion-icon><strong>{{ item.name }}</strong><span>{{ item.expiry_date | date:'MMM d' }}</span><small>Personal</small></article></div></section>
-  <section class="section"><div class="heading"><h2>Recommended for your household</h2><a routerLink="/tabs/recipes">See all</a></div><ion-card class="recipe-card" *ngFor="let item of recommendations"><div class="recipe-image" [class.food-photo]="item.recipe.name.toLowerCase().includes('adobo')"><ion-icon name="restaurant"></ion-icon><span>{{ item.match_percentage }}% Match</span></div><ion-card-content><h3>{{ item.recipe.name }}</h3><p><ion-icon name="time-outline"></ion-icon> {{ (item.recipe.prep_time || 0) + (item.recipe.cook_time || 0) }} mins <i></i> <ion-icon name="people-outline"></ion-icon> {{ item.recipe.servings || 2 }} servings</p><small *ngIf="item.missing_ingredients.length">Missing: {{ item.missing_ingredients.length }} ingredient{{ item.missing_ingredients.length === 1 ? '' : 's' }}</small><small class="ready" *ngIf="!item.missing_ingredients.length">Everything is in your pantry</small></ion-card-content></ion-card><p class="empty" *ngIf="!loading && !recommendations.length">Add recipes and pantry items to receive household recommendations.</p></section><p class="error" *ngIf="error">{{ error }}</p><ion-spinner *ngIf="loading" class="center"></ion-spinner></div></ion-content>
+<ion-content>
+  <div class="page wtc-tab-page">
+    <section *ngIf="loading" class="wtc-state wtc-state--loading" role="status" aria-live="polite">
+      <ion-spinner aria-label="Loading your kitchen overview"></ion-spinner>
+      <h2>Getting your kitchen ready</h2>
+      <p>Loading your pantry and meal ideas.</p>
+    </section>
+
+    <section *ngIf="!loading && error" class="wtc-state wtc-state--error" role="alert">
+      <ion-icon class="wtc-state__icon" name="alert-circle-outline" aria-hidden="true"></ion-icon>
+      <h2>We couldn’t load Home</h2>
+      <p>{{ error }}</p>
+      <ion-button fill="outline" (click)="loadDashboardData()">Try again</ion-button>
+    </section>
+
+    <ng-container *ngIf="!loading && !error">
+      <section class="dashboard-intro">
+        <div>
+          <p class="eyebrow">{{ greeting }}, {{ auth.user?.name || 'there' }}</p>
+          <h1>What’s happening in your kitchen today?</h1>
+        </div>
+        <ion-button fill="clear" size="small" (click)="loadDashboardData()" aria-label="Refresh dashboard">
+          <ion-icon slot="icon-only" name="refresh-outline"></ion-icon>
+        </ion-button>
+      </section>
+
+      <section class="household-switcher" aria-label="Recipe recommendation selection">
+        <ion-icon name="people-outline" aria-hidden="true"></ion-icon>
+        <ion-select [(ngModel)]="householdScope" (ionChange)="changeHousehold()" label="Recipe suggestions for" labelPlacement="stacked" interface="action-sheet">
+          <ion-select-option value="personal">My personal pantry</ion-select-option>
+          <ion-select-option *ngFor="let family of families" [value]="family.id">{{ family.name }} household</ion-select-option>
+        </ion-select>
+        <a routerLink="/family" aria-label="Manage households"><ion-icon name="settings-outline"></ion-icon></a>
+      </section>
+      <p class="scope-note">Your pantry overview below always includes your personal pantry and every shared pantry you belong to.</p>
+
+      <p class="load-notice" *ngIf="notice" role="status"><ion-icon name="information-circle-outline"></ion-icon>{{ notice }}</p>
+
+      <section class="dashboard-section pantry-overview">
+        <div class="section-heading">
+          <div><p class="eyebrow">Pantry overview</p><h2>At a glance</h2></div>
+          <a routerLink="/tabs/pantry">Manage pantry</a>
+        </div>
+        <div class="pantry-grid">
+          <a class="pantry-card pantry-card--personal" routerLink="/tabs/pantry">
+            <ion-icon name="person-outline" aria-hidden="true"></ion-icon>
+            <span>Personal pantry</span>
+            <strong>{{ personalItems.length }}</strong>
+            <small>item{{ personalItems.length === 1 ? '' : 's' }} on hand</small>
+            <p [class.is-clear]="!attention(personalItems).length">{{ attention(personalItems).length ? attention(personalItems).length + ' need attention' : 'All caught up' }}</p>
+          </a>
+          <a class="pantry-card pantry-card--shared" routerLink="/tabs/pantry" *ngFor="let family of families">
+            <ion-icon name="people-outline" aria-hidden="true"></ion-icon>
+            <span>{{ family.name }} pantry</span>
+            <strong>{{ sharedItems(family.id).length }}</strong>
+            <small>shared item{{ sharedItems(family.id).length === 1 ? '' : 's' }}</small>
+            <p [class.is-clear]="!attention(sharedItems(family.id)).length">{{ attention(sharedItems(family.id)).length ? attention(sharedItems(family.id)).length + ' need attention' : 'All caught up' }}</p>
+          </a>
+          <ng-container *ngIf="!families.length">
+            <a class="pantry-card pantry-card--invite" routerLink="/family">
+              <ion-icon name="people-outline" aria-hidden="true"></ion-icon>
+              <span>Shared pantry</span>
+              <strong>—</strong>
+              <small>Join or create a household to share items</small>
+              <p>Manage households</p>
+            </a>
+          </ng-container>
+        </div>
+      </section>
+
+      <section class="dashboard-section" *ngIf="attention(overviewItems()).length">
+        <div class="section-heading">
+          <div><p class="eyebrow">Use soon</p><h2>Items needing attention</h2></div>
+          <a routerLink="/tabs/pantry">See pantry</a>
+        </div>
+        <div class="expiry-scroll">
+          <article class="expiry-card" *ngFor="let item of attention(overviewItems())">
+            <span class="expiry-card__scope"><ion-icon [name]="item.family_id ? 'people-outline' : 'person-outline'"></ion-icon> {{ pantryOwner(item) }}</span>
+            <strong>{{ item.name }}</strong>
+            <p>{{ attentionLabel(item) }}</p>
+            <small *ngIf="item.expiry_date">{{ item.expiry_date | date:'MMM d' }}</small>
+          </article>
+        </div>
+      </section>
+
+      <section class="dashboard-section recommendations">
+        <div class="section-heading">
+          <div><p class="eyebrow">Based on {{ selectedPantryLabel }}</p><h2>Recommended for your household</h2></div>
+          <a routerLink="/tabs/recipes">See all</a>
+        </div>
+        <div class="recipe-list" *ngIf="recommendations.length; else noRecommendations">
+          <a class="recipe-card" *ngFor="let item of recommendations" [routerLink]="['/recipes', item.recipe.id]">
+            <img [src]="recipeImage(item)" [alt]="item.recipe.name" (error)="useFallbackImage($event)">
+            <div class="recipe-card__body">
+              <span class="match-badge">{{ item.match_percentage }}% pantry match</span>
+              <h3>{{ item.recipe.name }}</h3>
+              <p><ion-icon name="time-outline"></ion-icon>{{ (item.recipe.prep_time || 0) + (item.recipe.cook_time || 0) }} min <i></i><ion-icon name="people-outline"></ion-icon>{{ item.recipe.servings || 2 }} servings</p>
+              <small *ngIf="item.missing_ingredients.length">Missing {{ item.missing_ingredients.length }} ingredient{{ item.missing_ingredients.length === 1 ? '' : 's' }}</small>
+              <small class="ready" *ngIf="!item.missing_ingredients.length">Everything is in your pantry</small>
+            </div>
+          </a>
+        </div>
+        <ng-template #noRecommendations>
+          <section class="wtc-state wtc-state--empty wtc-state--compact">
+            <ion-icon class="wtc-state__icon" name="restaurant-outline" aria-hidden="true"></ion-icon>
+            <h2>No meal ideas yet</h2>
+            <p>Add recipes and pantry items to receive recommendations.</p>
+            <ion-button fill="outline" routerLink="/tabs/recipes">Browse recipes</ion-button>
+          </section>
+        </ng-template>
+      </section>
+    </ng-container>
+  </div>
+</ion-content>

@@ -82,4 +82,9 @@ describe('MealDetailsPage', () => {
     expect(component.confirmingCook).toBeFalse();
     expect(component.ingredientStatus(preflight.ingredients[3])).toBe('medium');
   });
+
+  it('explains the pantry impact of each swap choice', () => {
+    expect(component.swapPantryLabel({ recipe: { id: 4, name: 'Mongo' }, match_percentage: 100, available_ingredients: [], missing_ingredients: [] })).toBe('Pantry ready');
+    expect(component.swapPantryLabel({ recipe: { id: 5, name: 'Sinigang' }, match_percentage: 70, available_ingredients: [], missing_ingredients: [{ name: 'Tamarind', substitutes: [] }, { name: 'Pork', substitutes: [] }] })).toBe('2 ingredients to buy');
+  });
 });

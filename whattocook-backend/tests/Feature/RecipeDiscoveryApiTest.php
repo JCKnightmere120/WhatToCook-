@@ -76,6 +76,22 @@ class RecipeDiscoveryApiTest extends TestCase
             ->assertJsonMissing(['id' => $unsafe->id]);
     }
 
+    public function test_shellfish_allergy_excludes_shrimp_and_shrimp_paste_from_search_and_recommendations(): void
+    {
+        $user = User::factory()->create();
+        $user->profile()->create(['allergies' => ['shellfish']]);
+        $safe = $this->recipe('Vegetable Ginataan', [['name' => 'squash', 'quantity' => '1', 'unit' => 'pc']]);
+        $shrimp = $this->recipe('Shrimp Ginataan', [['name' => 'shrimp', 'quantity' => '1', 'unit' => 'cup']]);
+        $paste = $this->recipe('Bagoong Dish', [['name' => 'shrimp paste', 'quantity' => '1', 'unit' => 'tbsp']]);
+
+        $this->actingAs($user, 'sanctum')->getJson('/api/recipes')
+            ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $safe->id)
+            ->assertJsonMissing(['id' => $shrimp->id])->assertJsonMissing(['id' => $paste->id]);
+        $this->actingAs($user, 'sanctum')->getJson('/api/recipes/recommendations')
+            ->assertOk()->assertJsonCount(1, 'recommendations')->assertJsonPath('recommendations.0.recipe.id', $safe->id)
+            ->assertJsonMissing(['id' => $shrimp->id])->assertJsonMissing(['id' => $paste->id]);
+    }
+
     private function recipe(string $name, array $ingredients): Recipe
     {
         $recipe = Recipe::create(['name' => $name, 'instructions' => 'Cook and serve.']);

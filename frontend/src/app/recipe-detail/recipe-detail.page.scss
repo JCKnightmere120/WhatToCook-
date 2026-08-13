@@ -1,2 +1,39 @@
-.hero-image { width: 100%; max-height: 280px; object-fit: cover; border-radius: 12px; }
-.attribution { color: var(--ion-color-medium); font-size: .8rem; }
+.recipe-detail { display: grid; gap: var(--wtc-space-6); }
+.detail-message { margin: 0; color: var(--wtc-color-danger); }
+.recipe-hero { overflow: hidden; border: 1px solid var(--wtc-color-border); border-radius: var(--wtc-radius-xl); background: var(--wtc-color-surface); box-shadow: var(--wtc-shadow-card); }
+.hero-image { display: block; width: 100%; height: clamp(14rem, 52vw, 24rem); object-fit: cover; background: var(--wtc-color-surface-muted); }
+.recipe-hero__content { display: grid; gap: var(--wtc-space-3); padding: var(--wtc-space-5); }
+.recipe-hero h1, .recipe-hero p { margin: 0; }
+.recipe-hero__description { max-width: 46rem; font-size: var(--wtc-font-size-md); }
+.hero-meta { display: flex; flex-wrap: wrap; gap: var(--wtc-space-3); color: var(--wtc-color-text-muted); font-size: var(--wtc-font-size-sm); }
+.hero-meta span, .nutrition-status { display: inline-flex; align-items: center; gap: .35rem; }
+.hero-meta ion-icon { color: var(--wtc-color-primary); font-size: 1.1rem; }
+.attribution { margin: 0; padding: 0 var(--wtc-space-5) var(--wtc-space-4); color: var(--wtc-color-text-subtle); font-size: .72rem; }
+.servings-control { display: flex; align-items: center; justify-content: space-between; gap: var(--wtc-space-4); }
+.servings-control h2, .servings-control p { margin: 0; }
+.servings-control ion-item { width: min(100%, 10rem); border: 1px solid var(--wtc-color-border); border-radius: var(--wtc-radius-md); }
+.servings-control ion-note { white-space: nowrap; }
+.recipe-section { display: grid; gap: var(--wtc-space-3); }
+.section-heading { display: flex; align-items: end; justify-content: space-between; gap: var(--wtc-space-3); }
+.section-heading h2, .section-heading p { margin: 0; }
+.section-heading > span { color: var(--wtc-color-text-muted); font-size: var(--wtc-font-size-sm); }
+.ingredients-section ion-item ion-icon { color: var(--wtc-color-primary); font-size: .7rem; }
+.nutrition-status { margin: 0; padding: var(--wtc-space-3); border-radius: var(--wtc-radius-md); background: var(--wtc-color-neutral-soft); color: var(--wtc-color-text-muted); font-size: var(--wtc-font-size-sm); }
+.nutrition-status ion-icon { color: var(--wtc-color-primary); font-size: 1.2rem; }
+.nutrition-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--wtc-space-2); }
+.nutrition-grid div { padding: var(--wtc-space-3); border: 1px solid var(--wtc-color-border); border-radius: var(--wtc-radius-md); background: var(--wtc-color-surface); }
+.nutrition-grid span { display: block; color: var(--wtc-color-text-muted); font-size: var(--wtc-font-size-xs); }
+.nutrition-grid strong { display: block; margin-top: .2rem; color: var(--wtc-color-text); font-size: var(--wtc-font-size-md); }
+.nutrition-grid small { color: var(--wtc-color-text-muted); font-size: var(--wtc-font-size-xs); font-weight: 600; }
+.nutrition-disclaimer { margin: 0; color: var(--wtc-color-text-subtle); font-size: var(--wtc-font-size-xs); }
+.steps-list { display: grid; gap: var(--wtc-space-3); margin: 0; padding: 0; list-style: none; }
+.steps-list li { display: grid; grid-template-columns: 2rem 1fr; gap: var(--wtc-space-3); align-items: start; }
+.steps-list span { display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: 50%; background: var(--wtc-color-primary-soft); color: var(--wtc-color-primary-strong); font-size: var(--wtc-font-size-sm); font-weight: 700; }
+.steps-list p { margin: .2rem 0 0; }
+.cooking-tip { display: flex; gap: var(--wtc-space-3); padding: var(--wtc-space-4); border-radius: var(--wtc-radius-lg); background: var(--wtc-color-warning-soft); color: var(--wtc-color-warning); }
+.cooking-tip ion-icon { flex: 0 0 auto; font-size: 1.4rem; }
+.cooking-tip strong { color: var(--wtc-color-warning); }
+.cooking-tip p { margin: var(--wtc-space-1) 0 0; }
+.review-section ion-textarea { margin-top: var(--wtc-space-2); }
+.review-section ion-button { justify-self: start; margin: 0; }
+@media (max-width: 36rem) { .servings-control { display: grid; } .servings-control ion-item { width: 100%; } .nutrition-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

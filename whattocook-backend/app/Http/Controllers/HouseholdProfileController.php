@@ -166,7 +166,7 @@ class HouseholdProfileController extends Controller
         $visibility = $attributes['visible_to_family'] ?? [];
 
         foreach (self::PRIVATE_FIELDS as $field) {
-            if (array_key_exists($field, $visibility) && $visibility[$field] === false) {
+            if (($visibility[$field] ?? false) !== true) {
                 unset($attributes[$field]);
             }
         }

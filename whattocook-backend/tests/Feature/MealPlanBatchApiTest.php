@@ -129,6 +129,19 @@ class MealPlanBatchApiTest extends TestCase
         }
     }
 
+    public function test_generated_plans_apply_vegan_taxonomy_without_mistaking_eggplant_for_egg(): void
+    {
+        $user = User::factory()->create();
+        $user->profile()->create(['dietary_restrictions' => ['vegan']]);
+        $safe = $this->recipe($user, 'Eggplant Stew', 'eggplant', '1', 'pc');
+        $this->recipe($user, 'Egg Curry', 'egg', '1', 'pc');
+        $this->recipe($user, 'Pork Stew', 'pork', '1', 'kg');
+
+        $this->actingAs($user, 'sanctum')->postJson('/api/meal-plan-batches/generate', [
+            'start_date' => '2026-08-03', 'end_date' => '2026-08-03', 'meal_types' => ['dinner'], 'servings' => 1,
+        ])->assertCreated()->assertJsonPath('meal_plans.0.recipe_id', $safe->id);
+    }
+
     public function test_reuse_ulam_reuses_one_main_and_explains_the_choice(): void
     {
         $user = User::factory()->create(); $this->recipe($user, 'Adobo', 'Chicken', '1', 'kg'); $this->recipe($user, 'Munggo', 'Mung beans', '1', 'cup');

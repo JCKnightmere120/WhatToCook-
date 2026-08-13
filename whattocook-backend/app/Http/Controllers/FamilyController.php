@@ -8,6 +8,7 @@ use App\Models\HouseholdProfile;
 use App\Models\Profile;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class FamilyController extends Controller
 {
@@ -73,7 +74,12 @@ class FamilyController extends Controller
     {
         $this->owner($request, $family);
         abort_if($user->id === $family->owner_id, 422, 'The family owner cannot be removed.');
-        FamilyMember::where(['family_id' => $family->id, 'user_id' => $user->id])->firstOrFail()->delete();
+        DB::transaction(function () use ($family, $user) {
+            FamilyMember::where(['family_id' => $family->id, 'user_id' => $user->id])->firstOrFail()->delete();
+            // A removed account must not remain a selectable diner or affect
+            // the household's future recommendations and meal plans.
+            HouseholdProfile::where('family_id', $family->id)->where('user_id', $user->id)->delete();
+        });
 
         return response()->noContent();
     }

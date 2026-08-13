@@ -71,13 +71,18 @@
   (didDismiss)="confirmingCook = false">
 </ion-alert>
 
-<ion-modal [isOpen]="showSwap" (didDismiss)="showSwap = false">
+<ion-modal [isOpen]="showSwap" [breakpoints]="[0, 0.62, 0.92]" [initialBreakpoint]="0.62" handle="true" (didDismiss)="showSwap = false">
   <ng-template>
     <ion-header><ion-toolbar><ion-title>Swap meal</ion-title><ion-buttons slot="end"><ion-button (click)="showSwap = false">Cancel</ion-button></ion-buttons></ion-toolbar></ion-header>
     <ion-content class="ion-padding">
-      <p>Choose a profile-safe alternative. The date, meal type, diners, and servings stay the same.</p>
-      <ion-item><ion-select label="New meal" labelPlacement="stacked" [(ngModel)]="selectedSwapRecipeId"><ion-select-option *ngFor="let item of swapRecipes" [value]="item.recipe.id">{{ item.recipe.name }}</ion-select-option></ion-select></ion-item>
-      <ion-note color="medium" *ngIf="!swapRecipes.length">No alternative safe recipes are available right now.</ion-note>
+      <p class="swap-sheet__intro">Choose a profile-safe alternative. The date, meal type, diners, and servings stay the same.</p>
+      <div class="swap-options" *ngIf="swapRecipes.length; else noSwaps">
+        <button type="button" class="swap-option" *ngFor="let item of swapRecipes" [class.swap-option--selected]="selectedSwapRecipeId === item.recipe.id" (click)="selectedSwapRecipeId = item.recipe.id" [attr.aria-pressed]="selectedSwapRecipeId === item.recipe.id">
+          <span class="swap-option__radio" aria-hidden="true"><ion-icon *ngIf="selectedSwapRecipeId === item.recipe.id" name="checkmark"></ion-icon></span>
+          <span class="swap-option__body"><strong>{{ item.recipe.name }}</strong><small>{{ item.recipe.prep_time || 0 }} min prep · {{ item.match_percentage }}% pantry match</small><em [class.attention]="item.missing_ingredients.length || item.needs_review_ingredients?.length">{{ swapPantryLabel(item) }}</em></span>
+        </button>
+      </div>
+      <ng-template #noSwaps><ion-note color="medium">No alternative safe recipes are available right now.</ion-note></ng-template>
       <ion-button expand="block" (click)="swapMeal()" [disabled]="!selectedSwapRecipeId || swapping">{{ swapping ? 'Swapping…' : 'Save swap' }}</ion-button>
     </ion-content>
   </ng-template>

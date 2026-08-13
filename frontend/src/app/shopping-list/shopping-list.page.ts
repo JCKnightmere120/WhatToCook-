@@ -3,6 +3,7 @@ import { forkJoin } from 'rxjs';
 import { ApiService, ConfirmedPurchase, Family, ShoppingListItem } from '../services/api.service';
 import { AuthService } from '../services/auth.service';
 import { HouseholdContextService } from '../services/household-context.service';
+import { ExportLine, ExportService } from '../services/export.service';
 
 @Component({ selector: 'app-shopping-list', templateUrl: './shopping-list.page.html', styleUrls: ['./shopping-list.page.scss'], standalone: false })
 export class ShoppingListPage {
@@ -13,6 +14,7 @@ export class ShoppingListPage {
   unit = '';
   message = '';
   loading = false;
+  loadError = '';
   markingAll = false;
   confirmMarkAll = false;
   purchaseItem?: ShoppingListItem;
@@ -23,7 +25,7 @@ export class ShoppingListPage {
     { text: 'Mark all bought', role: 'confirm', handler: () => this.markAllBought() },
   ];
 
-  constructor(private api: ApiService, private auth: AuthService, private context: HouseholdContextService) {}
+  constructor(private api: ApiService, private auth: AuthService, private context: HouseholdContextService, private exports: ExportService) {}
 
   ionViewWillEnter(): void { this.load(); }
 
@@ -33,15 +35,16 @@ export class ShoppingListPage {
     const id = this.auth.user?.id;
     if (!id) return;
     this.loading = true;
+    this.loadError = '';
     this.context.refresh(id).subscribe({
       next: context => {
         this.household = context.activeFamily || undefined;
         this.api.shoppingList().subscribe({
           next: items => { this.items = this.household ? items.filter(item => item.family_id === this.household?.id) : items.filter(item => !item.family_id); this.loading = false; },
-          error: () => { this.message = 'Could not load the shopping list.'; this.loading = false; },
+          error: () => { this.loadError = 'Could not load the shopping list. Check your connection and try again.'; this.loading = false; },
         });
       },
-      error: () => { this.loading = false; this.message = 'Could not load your household.'; },
+      error: () => { this.loading = false; this.loadError = 'Could not load your household. Check your connection and try again.'; },
     });
   }
 
@@ -100,6 +103,14 @@ export class ShoppingListPage {
       next: () => this.items = this.items.filter(current => current.id !== item.id),
       error: () => this.message = 'Could not remove the item.',
     });
+  }
+
+  export(kind: 'text' | 'image' | 'pdf'): void {
+    const title = `${this.household ? this.household.name + ' shared' : 'Personal'} shopping list`;
+    const lines: ExportLine[] = this.items.map(item => ({ title: item.ingredient_name, detail: [item.quantity, item.unit].filter(Boolean).join(' '), checked: item.is_purchased }));
+    if (kind === 'text') this.exports.downloadText('whattocook-shopping-list.txt', lines);
+    if (kind === 'image') this.exports.downloadImage('whattocook-shopping-list.svg', title, lines);
+    if (kind === 'pdf') this.exports.print(title, lines);
   }
 
   private emptyPurchase(): ConfirmedPurchase { return { confirmed: true, quantity: '', unit: '', purchase_date: new Date().toISOString().slice(0, 10), expiry_date: null, purchase_source: 'unknown', storage_type: 'unknown' }; }

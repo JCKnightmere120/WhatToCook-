@@ -1,6 +1,24 @@
-<ion-content class="auth-content"><main class="auth-shell">
-  <section class="brand"><div class="brand-mark"><ion-icon name="restaurant"></ion-icon></div><p>WhatToCook?</p><h1>Meals that work for your whole family.</h1><span>Plan around what you have, who is eating, and what matters to them.</span></section>
-  <section class="auth-card"><div class="mode-toggle"><button [class.active]="mode === 'login'" (click)="mode = 'login'; error = ''">Sign in</button><button [class.active]="mode === 'register'" (click)="mode = 'register'; error = ''">Create account</button></div>
-    <form (ngSubmit)="submit()"><ion-input *ngIf="mode === 'register'" [(ngModel)]="name" name="name" label="Your name" labelPlacement="stacked" autocomplete="name" required></ion-input><ion-input [(ngModel)]="email" name="email" label="Email address" labelPlacement="stacked" type="email" autocomplete="email" required></ion-input><ion-input [(ngModel)]="password" name="password" label="Password" labelPlacement="stacked" type="password" autocomplete="current-password" required></ion-input><ion-input *ngIf="mode === 'register'" [(ngModel)]="passwordConfirmation" name="passwordConfirmation" label="Confirm password" labelPlacement="stacked" type="password" autocomplete="new-password" required></ion-input><p class="error" *ngIf="error">{{ error }}</p><ion-button expand="block" type="submit" [disabled]="submitting">{{ submitting ? 'Please wait…' : (mode === 'login' ? 'Sign in' : 'Create account') }}</ion-button></form>
-  </section>
-</main></ion-content>
+<ion-content class="auth-content">
+  <main class="auth-shell" id="main-content">
+    <section class="brand" aria-labelledby="auth-heading">
+      <div class="brand-mark"><ion-icon name="restaurant" aria-hidden="true"></ion-icon></div>
+      <p>WhatToCook?</p>
+      <h1 id="auth-heading">Meals that work for your whole family.</h1>
+      <span>Plan around what you have, who is eating, and what matters to them.</span>
+    </section>
+    <section class="auth-card" aria-label="Account access">
+      <div class="mode-toggle" role="group" aria-label="Account option">
+        <button type="button" [attr.aria-pressed]="mode === 'login'" [class.active]="mode === 'login'" (click)="mode = 'login'; error = ''">Sign in</button>
+        <button type="button" [attr.aria-pressed]="mode === 'register'" [class.active]="mode === 'register'" (click)="mode = 'register'; error = ''">Create account</button>
+      </div>
+      <form (ngSubmit)="submit()" novalidate>
+        <ion-input *ngIf="mode === 'register'" [(ngModel)]="name" name="name" label="Your name" labelPlacement="stacked" autocomplete="name" required></ion-input>
+        <ion-input [(ngModel)]="email" name="email" label="Email address" labelPlacement="stacked" type="email" inputmode="email" autocomplete="email" required></ion-input>
+        <ion-input [(ngModel)]="password" name="password" label="Password" labelPlacement="stacked" type="password" [autocomplete]="mode === 'login' ? 'current-password' : 'new-password'" required></ion-input>
+        <ion-input *ngIf="mode === 'register'" [(ngModel)]="passwordConfirmation" name="passwordConfirmation" label="Confirm password" labelPlacement="stacked" type="password" autocomplete="new-password" required></ion-input>
+        <p class="error" *ngIf="error" role="alert">{{ error }}</p>
+        <ion-button expand="block" type="submit" [disabled]="submitting">{{ submitting ? 'Please wait…' : (mode === 'login' ? 'Sign in' : 'Create account') }}</ion-button>
+      </form>
+    </section>
+  </main>
+</ion-content>

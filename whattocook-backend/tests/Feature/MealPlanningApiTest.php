@@ -93,6 +93,54 @@ class MealPlanningApiTest extends TestCase
         ])->assertUnprocessable()->assertJsonValidationErrors('personal_conflicts');
     }
 
+    public function test_child_safety_uses_the_scheduled_meal_date_not_todays_profile_age(): void
+    {
+        [$owner, , $family] = $this->family();
+        // This diner is a young child now but is an adult on the scheduled
+        // date. The date, not a cached/current age band, governs the rule.
+        $diner = HouseholdProfile::create([
+            'family_id' => $family['id'], 'name' => 'Ari', 'relation' => 'child', 'birth_date' => '2026-07-01',
+        ]);
+        $spicy = $this->recipe($owner, 'Spicy Adult Ulam', 'siling labuyo');
+
+        $this->actingAs($owner, 'sanctum')->postJson('/api/meal-plans', [
+            'recipe_id' => $spicy->id, 'family_id' => $family['id'], 'planned_date' => '2032-08-03', 'meal_type' => 'dinner',
+            'servings' => 1, 'diner_profile_ids' => [$diner->id],
+        ])->assertCreated();
+    }
+
+    public function test_manual_plans_apply_halal_and_vegetarian_taxonomy(): void
+    {
+        $user = User::factory()->create();
+        $user->profile()->create(['dietary_restrictions' => ['halal', 'vegetarian']]);
+        $pork = $this->recipe($user, 'Pork Adobo', 'pork belly');
+        $alcohol = $this->recipe($user, 'Wine Sauce', 'cooking wine');
+        $fish = $this->recipe($user, 'Fish Soup', 'fish');
+        $safe = $this->recipe($user, 'Vegetable Soup', 'squash');
+
+        foreach ([$pork, $alcohol, $fish] as $unsafe) {
+            $this->actingAs($user, 'sanctum')->postJson('/api/meal-plans', [
+                'recipe_id' => $unsafe->id, 'planned_date' => '2026-08-03', 'meal_type' => 'dinner', 'servings' => 1,
+            ])->assertUnprocessable()->assertJsonValidationErrors('recipe_id');
+        }
+        $this->actingAs($user, 'sanctum')->postJson('/api/meal-plans', [
+            'recipe_id' => $safe->id, 'planned_date' => '2026-08-03', 'meal_type' => 'dinner', 'servings' => 1,
+        ])->assertCreated();
+    }
+
+    public function test_legacy_generated_plans_apply_vegetarian_taxonomy(): void
+    {
+        [$owner, , $family] = $this->family();
+        $diner = HouseholdProfile::create(['family_id' => $family['id'], 'name' => 'Mika', 'dietary_restrictions' => ['vegetarian']]);
+        $safe = $this->recipe($owner, 'Vegetable Munggo', 'mung beans');
+        $this->recipe($owner, 'Chicken Tinola', 'chicken');
+
+        $this->actingAs($owner, 'sanctum')->postJson('/api/meal-plans/generate', [
+            'family_id' => $family['id'], 'start_date' => '2026-08-03', 'weeks' => 1,
+            'diner_profile_ids' => [$diner->id], 'meal_types' => ['dinner'],
+        ])->assertCreated()->assertJsonPath('meal_plans.0.recipe_id', $safe->id);
+    }
+
     private function family(): array
     {
         $owner = User::factory()->create();

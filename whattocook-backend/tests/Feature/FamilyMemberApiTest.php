@@ -33,18 +33,30 @@ class FamilyMemberApiTest extends TestCase
             ->assertCreated()
             ->json();
 
-        $this->actingAs($owner, 'sanctum')
+        $invitation = $this->actingAs($owner, 'sanctum')
             ->postJson("/api/families/{$family['id']}/members", [
                 'email' => $member->email,
                 'role' => 'member',
             ])
-            ->assertCreated();
+            ->assertCreated()->json('invitation');
+
+        $this->actingAs($member, 'sanctum')
+            ->postJson("/api/family-invitations/{$invitation['id']}/accept")
+            ->assertOk();
+        $this->assertDatabaseHas('household_profiles', [
+            'family_id' => $family['id'],
+            'user_id' => $member->id,
+        ]);
 
         $this->actingAs($owner, 'sanctum')
             ->deleteJson("/api/families/{$family['id']}/members/{$member->id}")
             ->assertNoContent();
 
         $this->assertDatabaseMissing('family_members', [
+            'family_id' => $family['id'],
+            'user_id' => $member->id,
+        ]);
+        $this->assertDatabaseMissing('household_profiles', [
             'family_id' => $family['id'],
             'user_id' => $member->id,
         ]);

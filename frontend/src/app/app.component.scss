@@ -1,0 +1,19 @@
+.wtc-skip-link {
+  position: fixed;
+  z-index: 10000;
+  top: 0.75rem;
+  left: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  background: var(--ion-color-primary);
+  color: var(--ion-color-primary-contrast);
+  font-weight: 700;
+  text-decoration: none;
+  transform: translateY(-150%);
+}
+
+.wtc-skip-link:focus {
+  transform: translateY(0);
+  outline: 3px solid var(--wtc-color-surface);
+  outline-offset: 2px;
+}
