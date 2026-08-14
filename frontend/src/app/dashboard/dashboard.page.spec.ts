@@ -39,7 +39,7 @@ describe('DashboardPage', () => {
     api.recommendations.and.returnValue(of({ recommendations: [] }));
     const context = jasmine.createSpyObj<HouseholdContextService>('HouseholdContextService', ['refresh']);
     context.refresh.and.returnValue(of({ userId: 1, families: [family, secondFamily], activeFamily: family }));
-    const page = new DashboardPage(api, context, { user: { id: 1 } } as AuthService);
+    const page = new DashboardPage(api, context, jasmine.createSpyObj('Router', ['navigate']), jasmine.createSpyObj('AlertController', ['create']), { user: { id: 1 } } as AuthService);
 
     page.loadDashboardData();
 
@@ -62,7 +62,7 @@ describe('DashboardPage', () => {
       of({ userId: 1, families: [family], activeFamily: family }),
       of({ userId: 1, families: [family], activeFamily: null }),
     );
-    const page = new DashboardPage(api, context, { user: { id: 1 } } as AuthService);
+    const page = new DashboardPage(api, context, jasmine.createSpyObj('Router', ['navigate']), jasmine.createSpyObj('AlertController', ['create']), { user: { id: 1 } } as AuthService);
 
     page.loadDashboardData();
     page.householdScope = 'personal';

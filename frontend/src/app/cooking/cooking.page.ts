@@ -125,7 +125,7 @@ export class CookingPage {
     request.subscribe({
       next: result => {
         this.progress.clear(this.auth.user!.id, this.mealPlanId!);
-        this.router.navigate(['/meal-details', this.mealPlanId], { state: { message: result.message || fallback }, replaceUrl: true });
+        this.router.navigate(['/tabs/dashboard'], { state: { message: result.message || fallback }, replaceUrl: true });
       },
       error: error => { this.finishing = false; this.message = error?.error?.message || 'Could not finish this meal. Please try again.'; },
     });

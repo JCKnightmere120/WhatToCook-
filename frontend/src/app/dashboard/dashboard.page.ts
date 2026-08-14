@@ -1,7 +1,9 @@
 import { Component } from '@angular/core';
+import { AlertController } from '@ionic/angular';
 import { ApiService, Family, PantryItem, Recommendation } from '../services/api.service';
 import { AuthService } from '../services/auth.service';
 import { HouseholdContextService } from '../services/household-context.service';
+import { Router } from '@angular/router';
 import { forkJoin, of } from 'rxjs';
 import { catchError, map, switchMap } from 'rxjs/operators';
 
@@ -17,7 +19,7 @@ export class DashboardPage {
   error = '';
   notice = '';
 
-  constructor(private api: ApiService, private householdContext: HouseholdContextService, public auth: AuthService) {}
+  constructor(private api: ApiService, private householdContext: HouseholdContextService, private router: Router, private alerts: AlertController, public auth: AuthService) {}
 
   ionViewWillEnter(): void { this.loadDashboardData(); }
 
@@ -41,7 +43,7 @@ export class DashboardPage {
     if (!this.api.hasToken || !userId) return;
     this.loading = true;
     this.error = '';
-    this.notice = '';
+    this.notice = history.state?.message || '';
     this.householdContext.refresh(userId).pipe(
       switchMap(context => {
         this.families = context.families;
@@ -106,4 +108,28 @@ export class DashboardPage {
 
   recipeImage(item: Recommendation): string { return item.recipe.image || 'assets/shapes.svg'; }
   useFallbackImage(event: Event): void { (event.target as HTMLImageElement).src = 'assets/shapes.svg'; }
+  async cookRecommendation(event: Event, item: Recommendation): Promise<void> {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!item.recipe.id) return;
+    const servings = await this.chooseServings(item);
+    if (!servings) return;
+    this.api.createMealPlan({
+      recipe_id: item.recipe.id,
+      family_id: this.activeFamily?.id,
+      planned_date: new Date().toISOString().slice(0, 10),
+      meal_type: item.recipe.meal_type || 'dinner',
+      servings,
+    }).subscribe({ next: plan => this.router.navigate(['/cooking', plan.id]), error: error => this.notice = error?.error?.message || 'Could not start cooking. Please try again.' });
+  }
+
+  private async chooseServings(item: Recommendation): Promise<number | undefined> {
+    let servings: number | undefined;
+    const alert = await this.alerts.create({
+      header: `Cook ${item.recipe.name}?`, message: 'Choose the number of servings before starting Guided Cooking.',
+      inputs: [{ name: 'servings', type: 'number', value: String(item.recipe.servings || 1), min: 1, max: 100, label: 'Servings' }],
+      buttons: [{ text: 'Cancel', role: 'cancel' }, { text: 'Start cooking', role: 'confirm', handler: values => { servings = Math.max(1, Math.min(100, Number(values.servings) || 1)); } }],
+    });
+    await alert.present(); await alert.onDidDismiss(); return servings;
+  }
 }

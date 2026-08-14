@@ -80,7 +80,10 @@ export class ApiService {
     if (familyId) params['family_id'] = String(familyId);
     if (filters.mealType) params['meal_type'] = filters.mealType;
     if (filters.difficulty) params['difficulty'] = filters.difficulty;
-    if (filters.maxTime) params['max_time'] = String(filters.maxTime);
+    // Ionic can surface an unselected numeric option as the string
+    // "undefined". Only send a valid positive integer to Laravel.
+    const maxTime = Number(filters.maxTime);
+    if (Number.isInteger(maxTime) && maxTime > 0) params['max_time'] = String(maxTime);
     if (filters.page) params['page'] = String(filters.page);
     return this.http.get<RecipeSearchResponse>(`${this.baseUrl}/recipes`, { ...this.options(), params });
   }

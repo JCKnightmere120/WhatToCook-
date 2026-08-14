@@ -97,6 +97,7 @@
               <p><ion-icon name="time-outline"></ion-icon>{{ (item.recipe.prep_time || 0) + (item.recipe.cook_time || 0) }} min <i></i><ion-icon name="people-outline"></ion-icon>{{ item.recipe.servings || 2 }} servings</p>
               <small *ngIf="item.missing_ingredients.length">Missing {{ item.missing_ingredients.length }} ingredient{{ item.missing_ingredients.length === 1 ? '' : 's' }}</small>
               <small class="ready" *ngIf="!item.missing_ingredients.length">Everything is in your pantry</small>
+              <ion-button size="small" (click)="cookRecommendation($event, item)"><ion-icon name="restaurant-outline" slot="start"></ion-icon>Cook now</ion-button>
             </div>
           </a>
         </div>

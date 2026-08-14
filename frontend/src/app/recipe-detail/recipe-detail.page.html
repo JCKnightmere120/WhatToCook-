@@ -19,6 +19,7 @@
       </section>
 
       <section class="servings-control wtc-card" aria-label="Serving size"><div><p class="wtc-eyebrow">Adjust recipe</p><h2>How many are you serving?</h2></div><ion-item lines="none"><ion-input aria-label="Servings" type="number" min="1" [(ngModel)]="servings"></ion-input><ion-note slot="end">servings</ion-note></ion-item></section>
+      <ion-button class="cook-now" expand="block" (click)="cookNow()" [disabled]="startingCooking"><ion-icon name="restaurant-outline" slot="start"></ion-icon>{{ startingCooking ? 'Starting cooking…' : 'Cook now' }}</ion-button>
 
       <section class="recipe-section ingredients-section"><div class="section-heading"><div><p class="wtc-eyebrow">Shopping checklist</p><h2>Ingredients</h2></div><span>{{ recipe.ingredients.length }} items</span></div><ion-list inset="true" lines="full"><ion-item *ngFor="let ingredient of recipe.ingredients"><ion-icon name="ellipse-outline" slot="start" aria-hidden="true"></ion-icon><ion-label>{{ ingredientQuantity(ingredient.quantity) }} {{ ingredient.unit || '' }} {{ ingredient.name }}</ion-label></ion-item></ion-list></section>
 

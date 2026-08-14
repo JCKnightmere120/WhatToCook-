@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { ApiService, Family, PackageItem, Recommendation, RecipeIngredient } from '../services/api.service';
 import { AuthService } from '../services/auth.service';
 import { HouseholdContextService } from '../services/household-context.service';
+import { AlertController } from '@ionic/angular';
 
 @Component({ selector: 'app-recipes', templateUrl: 'recipes.page.html', styleUrls: ['recipes.page.scss'], standalone: false })
 export class RecipesPage implements OnDestroy {
@@ -26,10 +27,11 @@ export class RecipesPage implements OnDestroy {
   packageAmount?: number;
   packageUnit = 'g';
   savingConversion = false;
+  startingRecipeId?: number;
   private activeFamilyId?: number;
   private searchTimer?: ReturnType<typeof setTimeout>;
 
-  constructor(private api: ApiService, private householdContext: HouseholdContextService, private auth: AuthService, private router: Router) {}
+  constructor(private api: ApiService, private householdContext: HouseholdContextService, private auth: AuthService, private router: Router, private alerts: AlertController) {}
   ionViewWillEnter(): void { this.loadRecipeDiscovery(); }
   ngOnDestroy(): void { if (this.searchTimer) clearTimeout(this.searchTimer); }
 
@@ -70,8 +72,23 @@ export class RecipesPage implements OnDestroy {
   }
 
   loadMore(): void { if (this.hasMore && !this.loadingMore) this.loadRecipes(this.currentPage + 1, true); }
-  showRecipeDetails(recipe: Recommendation): void { this.router.navigate(['/recipes', recipe.recipe.id]); }
+  showRecipeDetails(recipe: Recommendation): void { this.router.navigate(['/recipes', recipe.recipe.id], { queryParams: this.activeFamilyId ? { family_id: this.activeFamilyId } : {} }); }
   addMissingIngredientsToShoppingList(recipe: Recommendation): void { this.api.addMissingToList(recipe.recipe.id, this.activeFamilyId).subscribe({ next: () => this.message = `${recipe.recipe.name}: missing ingredients added to your shopping list.`, error: () => this.message = 'Could not update the shopping list.' }); }
+  async cookNow(recipe: Recommendation): Promise<void> {
+    if (this.startingRecipeId) return;
+    const servings = await this.chooseServings(recipe);
+    if (!servings) return;
+    this.startingRecipeId = recipe.recipe.id;
+    this.api.createMealPlan({ recipe_id: recipe.recipe.id, family_id: this.activeFamilyId, planned_date: new Date().toISOString().slice(0, 10), meal_type: recipe.recipe.meal_type || 'dinner', servings }).subscribe({
+      next: plan => this.router.navigate(['/cooking', plan.id]),
+      error: error => { this.startingRecipeId = undefined; this.message = error?.error?.message || 'Could not start cooking. Please try again.'; },
+    });
+  }
+  private async chooseServings(recipe: Recommendation): Promise<number | undefined> {
+    let servings: number | undefined;
+    const alert = await this.alerts.create({ header: `Cook ${recipe.recipe.name}?`, message: 'Choose the number of servings before starting Guided Cooking.', inputs: [{ name: 'servings', type: 'number', value: String(recipe.recipe.servings || 1), min: 1, max: 100, label: 'Servings' }], buttons: [{ text: 'Cancel', role: 'cancel' }, { text: 'Start cooking', role: 'confirm', handler: values => { servings = Math.max(1, Math.min(100, Number(values.servings) || 1)); } }] });
+    await alert.present(); await alert.onDidDismiss(); return servings;
+  }
   toggleFavorite(recipe: Recommendation): void {
     const id = recipe.recipe.id;
     const isFavorite = this.favorites.has(id);

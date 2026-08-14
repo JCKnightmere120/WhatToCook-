@@ -37,7 +37,7 @@ describe('RecipesPage', () => {
     api.searchRecipes.and.returnValue(of({ data: [], current_page: 1, last_page: 1, total: 0 }));
     Object.defineProperty(api, 'hasToken', { value: true });
     const context = jasmine.createSpyObj<HouseholdContextService>('HouseholdContextService', ['select']);
-    const page = new RecipesPage(api, context, { user: { id: 1 } } as AuthService, jasmine.createSpyObj('Router', ['navigate']));
+    const page = new RecipesPage(api, context, { user: { id: 1 } } as AuthService, jasmine.createSpyObj('Router', ['navigate']), jasmine.createSpyObj('AlertController', ['create']));
     page.families = [family];
     page.cookingScope = 'personal';
 
@@ -50,7 +50,7 @@ describe('RecipesPage', () => {
   it('requests the next page when more recipes are available', () => {
     const api = jasmine.createSpyObj<ApiService>('ApiService', ['searchRecipes']);
     api.searchRecipes.and.returnValue(of({ data: [], current_page: 2, last_page: 3, total: 30 }));
-    const page = new RecipesPage(api, jasmine.createSpyObj('HouseholdContextService', ['refresh']), { user: { id: 1 } } as AuthService, jasmine.createSpyObj('Router', ['navigate']));
+    const page = new RecipesPage(api, jasmine.createSpyObj('HouseholdContextService', ['refresh']), { user: { id: 1 } } as AuthService, jasmine.createSpyObj('Router', ['navigate']), jasmine.createSpyObj('AlertController', ['create']));
     page.currentPage = 1; page.lastPage = 3;
     page.loadMore();
     expect(api.searchRecipes).toHaveBeenCalledWith('', undefined, jasmine.objectContaining({ page: 2 }));
