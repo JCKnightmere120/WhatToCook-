@@ -57,6 +57,6 @@ describe('CookingPage', () => {
 
     expect(api.cookMealPlan).toHaveBeenCalledWith(42, '');
     expect(progress.clear).toHaveBeenCalledWith(7, 42);
-    expect(router.navigate).toHaveBeenCalledWith(['/meal-details', 42], jasmine.objectContaining({ replaceUrl: true }));
+    expect(router.navigate).toHaveBeenCalledWith(['/tabs/dashboard'], jasmine.objectContaining({ replaceUrl: true }));
   });
 });

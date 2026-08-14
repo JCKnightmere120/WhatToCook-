@@ -1,6 +1,6 @@
-import { Component } from '@angular/core';
+import { Component, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { forkJoin } from 'rxjs';
+import { forkJoin, Subscription } from 'rxjs';
 import { BarcodeFormat, BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
 import { SpeechRecognition } from '@capacitor-community/speech-recognition';
 import { TextRecognition } from '@capacitor-mlkit/text-recognition';
@@ -14,6 +14,7 @@ import { PantryInputCacheService } from '../services/pantry-input-cache.service'
 import { ModalController, ToastController } from '@ionic/angular';
 import { UseAmountModalComponent } from './use-amount-modal.component';
 import { FreshnessReminderService } from '../services/freshness-reminder.service';
+import { PantryChangeService } from '../services/pantry-change.service';
 
 interface PantryForm { name: string; quantity: string; unit: string; purchase_date: string; expiry_date: string; freshness_review_date: string; purchase_source: string; storage_type: string; freshness_condition: string; family_id: number | null; }
 interface ParsedPantryDraft { name: string; quantity: string; unit: string; selected: boolean; }
@@ -29,7 +30,7 @@ export function receiptCandidates(text: string): PantryInputCandidate[] {
 }
 
 @Component({ selector: 'app-pantry', templateUrl: 'pantry.page.html', styleUrls: ['pantry.page.scss'], standalone: false })
-export class PantryPage {
+export class PantryPage implements OnDestroy {
   personalItems: PantryItem[] = []; householdItems: PantryItem[] = []; families: Family[] = []; activeFamily?: Family; viewFamilyId: number | null = null; form: PantryForm = this.emptyForm(); editingId: number | null = null;
   message = ''; saving = false; processingInput = false; listening = false; receiptText = ''; voiceReviewTranscript = ''; receiptReviewText = ''; confirmingPantryAdd = false;
   drafts: ParsedPantryDraft[] = []; suggestedCandidates: PantryInputCandidate[] = []; rejectedCandidates: PantryInputCandidate[] = []; pendingSuggestion?: PantryInputCandidate; showAdvancedDetails = false; returnToMealId?: number;
@@ -41,9 +42,15 @@ export class PantryPage {
   pantryLoadError = '';
   private hiddenInventoryKeys = new Set<string>();
   private requestedScope?: 'personal' | 'family'; private requestedFamilyId?: number;
+  private pantryMutationVersion = 0;
+  private pantryLoadRequest = 0;
+  private readonly pantryChangeSubscription: Subscription;
   readonly commonUnits = ['pieces', 'cans', 'packs', 'bottles', 'boxes', 'kg', 'g', 'ml', 'litre'];
   private recognition: any; private voiceTranscript = ''; private stoppingVoice = false;
-  constructor(private api: ApiService, private householdContext: HouseholdContextService, private auth: AuthService, private inputCache: PantryInputCacheService, private route: ActivatedRoute, private router: Router, private modalController: ModalController, private toastController: ToastController, private reminders: FreshnessReminderService) {}
+  constructor(private api: ApiService, private householdContext: HouseholdContextService, private auth: AuthService, private inputCache: PantryInputCacheService, private route: ActivatedRoute, private router: Router, private modalController: ModalController, private toastController: ToastController, private reminders: FreshnessReminderService, pantryChanges: PantryChangeService) {
+    this.pantryChangeSubscription = pantryChanges.changes$.subscribe(change => this.applyPantryChange(change.items));
+  }
+  ngOnDestroy(): void { this.pantryChangeSubscription.unsubscribe(); }
   ionViewWillEnter() { this.readMealReturnContext(); this.loadFamilies(); }
   loadPantryItems() {
     if (!this.api.hasToken) {
@@ -53,14 +60,28 @@ export class PantryPage {
     }
     this.loading = true;
     this.pantryLoadError = '';
+    const requestId = ++this.pantryLoadRequest;
+    const mutationVersion = this.pantryMutationVersion;
     this.api.pantry().subscribe({
       next: items => {
+        if (requestId !== this.pantryLoadRequest) return;
+        // Do not let a request begun before a confirmed purchase overwrite the
+        // immediate update. Reload once with the newer pantry state instead.
+        if (mutationVersion !== this.pantryMutationVersion) {
+          this.loadPantryItems();
+          return;
+        }
         this.personalItems = items.filter(item => !item.family_id);
         this.householdItems = items.filter(item => !!item.family_id);
         this.refreshReminders();
         this.loading = false;
       },
       error: () => {
+        if (requestId !== this.pantryLoadRequest) return;
+        if (mutationVersion !== this.pantryMutationVersion) {
+          this.loadPantryItems();
+          return;
+        }
         this.pantryLoadError = 'Could not load your pantry. Check your connection and try again.';
         this.loading = false;
       },
@@ -132,6 +153,21 @@ export class PantryPage {
   inventoryVisible(key: string): boolean { return !this.hiddenInventoryKeys.has(key); }
   toggleInventory(key: string): void { this.hiddenInventoryKeys.has(key) ? this.hiddenInventoryKeys.delete(key) : this.hiddenInventoryKeys.add(key); }
   returnToMeal(): void { if (this.returnToMealId) this.router.navigate(['/meal-details', this.returnToMealId]); }
+  private applyPantryChange(items: PantryItem[]): void {
+    if (!items.length) return;
+    this.pantryMutationVersion++;
+    const personalItems = items.filter(item => !item.family_id);
+    const householdItems = items.filter(item => !!item.family_id);
+    this.personalItems = this.mergePantryItems(this.personalItems, personalItems);
+    this.householdItems = this.mergePantryItems(this.householdItems, householdItems);
+    this.pantryLoadError = '';
+    this.refreshReminders();
+  }
+  private mergePantryItems(current: PantryItem[], changes: PantryItem[]): PantryItem[] {
+    const items = new Map(current.map(item => [item.id, item]));
+    changes.forEach(item => items.set(item.id, item));
+    return Array.from(items.values());
+  }
   private readMealReturnContext(): void { const scope = this.route.snapshot.queryParamMap.get('scope'); this.requestedScope = scope === 'family' || scope === 'personal' ? scope : undefined; const familyId = Number(this.route.snapshot.queryParamMap.get('family_id')); this.requestedFamilyId = Number.isInteger(familyId) && familyId > 0 ? familyId : undefined; const mealId = Number(this.route.snapshot.queryParamMap.get('return_to_meal_id')); this.returnToMealId = Number.isInteger(mealId) && mealId > 0 ? mealId : undefined; }
   private emptyForm(familyId: number | null = null): PantryForm { return { name: '', quantity: '1', unit: '', purchase_date: new Date().toISOString().slice(0, 10), expiry_date: '', freshness_review_date: '', purchase_source: 'unknown', storage_type: 'unknown', freshness_condition: 'unknown', family_id: familyId }; }
   private dateOnly(value?: string): string { return value ? value.slice(0, 10) : ''; }

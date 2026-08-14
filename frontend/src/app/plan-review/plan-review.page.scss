@@ -48,3 +48,7 @@ ion-note {
 .save-change {
   margin-top: 18px;
 }
+
+ion-card[color="warning"] { --background: var(--wtc-color-warning-soft); --color: var(--wtc-color-text); border-color: var(--wtc-color-warning); }
+
+@media (max-width: 25.25rem) { .page { padding: var(--wtc-space-3); } .actions { gap: var(--wtc-space-3); } }

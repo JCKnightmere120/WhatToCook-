@@ -1,5 +1,6 @@
 import { Component } from '@angular/core';
-import { forkJoin } from 'rxjs';
+import { forkJoin, Subscription } from 'rxjs';
+import { finalize, switchMap } from 'rxjs/operators';
 import { ApiService, ConfirmedPurchase, Family, ShoppingListItem } from '../services/api.service';
 import { AuthService } from '../services/auth.service';
 import { HouseholdContextService } from '../services/household-context.service';
@@ -20,6 +21,8 @@ export class ShoppingListPage {
   purchaseItem?: ShoppingListItem;
   purchase: ConfirmedPurchase = this.emptyPurchase();
   confirmingPurchase = false;
+  private loadSubscription?: Subscription;
+  private loadAttempt = 0;
   readonly markAllAlertButtons = [
     { text: 'Cancel', role: 'cancel' },
     { text: 'Mark all bought', role: 'confirm', handler: () => this.markAllBought() },
@@ -28,24 +31,44 @@ export class ShoppingListPage {
   constructor(private api: ApiService, private auth: AuthService, private context: HouseholdContextService, private exports: ExportService) {}
 
   ionViewWillEnter(): void { this.load(); }
+  ionViewWillLeave(): void { this.cancelLoad(); }
 
   get remainingItems(): ShoppingListItem[] { return this.items.filter(item => !item.is_purchased); }
 
   load(): void {
     const id = this.auth.user?.id;
     if (!id) return;
+    this.cancelLoad();
+    const attempt = ++this.loadAttempt;
     this.loading = true;
     this.loadError = '';
-    this.context.refresh(id).subscribe({
-      next: context => {
+    this.loadSubscription = this.context.refresh(id).pipe(
+      switchMap(context => {
         this.household = context.activeFamily || undefined;
-        this.api.shoppingList().subscribe({
-          next: items => { this.items = this.household ? items.filter(item => item.family_id === this.household?.id) : items.filter(item => !item.family_id); this.loading = false; },
-          error: () => { this.loadError = 'Could not load the shopping list. Check your connection and try again.'; this.loading = false; },
-        });
+        return this.api.shoppingList();
+      }),
+      finalize(() => {
+        if (this.loadAttempt === attempt) this.loading = false;
+      }),
+    ).subscribe({
+      next: items => {
+        if (this.loadAttempt !== attempt) return;
+        this.items = this.household
+          ? items.filter(item => item.family_id === this.household?.id)
+          : items.filter(item => !item.family_id);
       },
-      error: () => { this.loading = false; this.loadError = 'Could not load your household. Check your connection and try again.'; },
+      error: error => {
+        if (this.loadAttempt !== attempt) return;
+        this.loadError = error?.status === 429
+          ? 'The service is temporarily busy. Please wait a moment, then try again.'
+          : 'Could not load the shopping list. Check your connection and try again.';
+      },
     });
+  }
+
+  private cancelLoad(): void {
+    this.loadSubscription?.unsubscribe();
+    this.loadSubscription = undefined;
   }
 
   add(): void {

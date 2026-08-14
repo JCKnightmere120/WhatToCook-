@@ -27,20 +27,21 @@
         </ion-item>
       </section>
 
-      <div class="planner-controls">
-        <ion-item lines="none">
-          <ion-select label="View" [(ngModel)]="periodWeeks" (ionChange)="changePeriod()">
-            <ion-select-option [value]="1">1 week</ion-select-option>
-            <ion-select-option [value]="2">2 weeks</ion-select-option>
-            <ion-select-option [value]="4">4 weeks</ion-select-option>
-          </ion-select>
-        </ion-item>
+      <section class="week-summary" aria-label="Current week">
+        <div><p class="eyebrow">THIS WEEK</p><h2>{{ periodLabel() }}</h2><p>{{ plannedMealCount }} planned meal{{ plannedMealCount === 1 ? '' : 's' }}</p></div>
+        <ion-button fill="clear" size="small" (click)="currentPeriod()">Today</ion-button>
+      </section>
+
+      <div class="week-nav" aria-label="Week navigation">
+        <ion-button fill="clear" (click)="previousPeriod()" aria-label="Previous period"><ion-icon name="chevron-back-outline"></ion-icon></ion-button>
+        <span>Choose a day</span>
+        <ion-button fill="clear" (click)="nextPeriod()" aria-label="Next period"><ion-icon name="chevron-forward-outline"></ion-icon></ion-button>
       </div>
 
-      <div class="week-nav">
-        <ion-button fill="clear" (click)="previousPeriod()" aria-label="Previous period"><ion-icon name="chevron-back-outline"></ion-icon></ion-button>
-        <button type="button" (click)="currentPeriod()">{{ periodLabel() }}</button>
-        <ion-button fill="clear" (click)="nextPeriod()" aria-label="Next period"><ion-icon name="chevron-forward-outline"></ion-icon></ion-button>
+      <div class="day-navigator" role="tablist" aria-label="Days in this week">
+        <button *ngFor="let day of days" type="button" role="tab" aria-controls="selected-day-agenda" [attr.aria-selected]="dateOnly(day) === dateOnly(selectedDay || day)" [attr.tabindex]="dateOnly(day) === dateOnly(selectedDay || day) ? 0 : -1" [class.is-selected]="dateOnly(day) === dateOnly(selectedDay || day)" [class.has-plans]="plannedCount(day) > 0" (click)="selectDay(day)">
+          <span>{{ dateLabel(day) }}</span><strong>{{ dayNumber(day) }}</strong><small *ngIf="plannedCount(day)">{{ plannedCount(day) }} meal{{ plannedCount(day) === 1 ? '' : 's' }}</small><i *ngIf="!plannedCount(day)" aria-hidden="true"></i>
+        </button>
       </div>
 
       <section class="week-actions" aria-label="Weekly plan actions">
@@ -50,13 +51,12 @@
 
       <p class="notice" *ngIf="household && !diners.length">Add diner profiles in Family before scheduling shared meals.</p>
 
-      <section class="week" aria-label="Meal schedule">
-        <article class="day" *ngFor="let day of days">
-          <header><span>{{ dateLabel(day) }}</span><strong>{{ dayNumber(day) }}</strong></header>
-          <div class="slot" *ngFor="let type of mealTypes">
+      <section id="selected-day-agenda" class="agenda" *ngIf="selectedDay && !showAllPlannedDays" role="tabpanel" aria-label="Selected day agenda">
+        <header><div><p class="eyebrow">SELECTED DAY</p><h2>{{ selectedDayLabel(selectedDay) }}</h2></div><ion-badge *ngIf="selectedDayPlans.length" color="success">{{ selectedDayPlans.length }} planned</ion-badge></header>
+        <div class="slot" *ngFor="let type of mealTypes">
             <span class="meal-type">{{ type }}</span>
-            <ng-container *ngIf="planFor(day, type) as plan; else addMeal">
-              <button type="button" class="planned" (click)="openSlot(day, type, plan)">
+            <ng-container *ngIf="planFor(selectedDay, type) as plan; else addMeal">
+              <button type="button" class="planned" (click)="openSlot(selectedDay, type, plan)">
                 <strong>{{ recipeName(plan) }}</strong>
                 <small>{{ servingsFor(plan) }} servings · {{ dinersFor(plan) }}</small>
                 <span class="readiness" [class]="'readiness readiness--' + readiness(plan)"><ion-icon [name]="readiness(plan) === 'ready' ? 'checkmark-circle' : readiness(plan) === 'attention' ? 'cart-outline' : readiness(plan) === 'cooked' ? 'checkmark-done-outline' : 'help-circle-outline'"></ion-icon>{{ readinessLabel(plan) }}</span>
@@ -70,13 +70,20 @@
               <small class="cooked" *ngIf="isCooked(plan)">Cooked</small>
             </ng-container>
             <ng-template #addMeal>
-              <button type="button" class="add" [disabled]="household && !diners.length" (click)="openSlot(day, type)">
+              <button type="button" class="add" [disabled]="household && !diners.length" (click)="openSlot(selectedDay, type)">
                 <ion-icon name="add-outline"></ion-icon> Add meal
               </button>
             </ng-template>
-          </div>
-        </article>
+        </div>
       </section>
+
+      <section class="all-planned" *ngIf="showAllPlannedDays" aria-label="All planned days">
+        <header><div><p class="eyebrow">FULL SCHEDULE</p><h2>All planned days</h2></div><ion-button fill="clear" size="small" (click)="showAllPlannedDays = false">Back to agenda</ion-button></header>
+        <article *ngFor="let day of allPlannedDays"><button type="button" (click)="selectDay(day)"><strong>{{ selectedDayLabel(day) }}</strong><span>{{ plannedCount(day) }} planned meal{{ plannedCount(day) === 1 ? '' : 's' }}</span></button><div><button type="button" *ngFor="let plan of plansForDay(day)" (click)="openMealDetails(plan)">{{ plan.meal_type | titlecase }} · {{ recipeName(plan) }}</button></div></article>
+        <p *ngIf="!allPlannedDays.length" class="empty">No meals are planned for this week yet.</p>
+      </section>
+
+      <ion-button class="all-planned-toggle" expand="block" fill="outline" (click)="showAllPlannedDays = !showAllPlannedDays">{{ showAllPlannedDays ? 'Back to selected day' : 'All planned days' }}</ion-button>
     </ng-container>
   </main>
 </ion-content>
@@ -90,11 +97,11 @@
   </ion-toolbar>
 </ion-footer>
 
-<ion-modal [isOpen]="!!draft" (didDismiss)="closeEditor()">
+<ion-modal [isOpen]="!!draft" aria-labelledby="meal-editor-title" (didDismiss)="onEditorDidDismiss()">
   <ng-template>
     <ion-header>
       <ion-toolbar>
-        <ion-title>{{ draft?.planId ? 'Edit' : 'Plan' }} {{ draft?.mealType }}</ion-title>
+        <ion-title id="meal-editor-title">{{ draft?.planId ? 'Edit' : 'Plan' }} {{ draft?.mealType }}</ion-title>
         <ion-buttons slot="end"><ion-button (click)="closeEditor()">Close</ion-button></ion-buttons>
       </ion-toolbar>
     </ion-header>
@@ -124,4 +131,4 @@
   </ng-template>
 </ion-modal>
 
-<ion-alert [isOpen]="!!deleteCandidate" header="Delete this planned meal?" [message]="'Remove ' + (deleteCandidate ? recipeName(deleteCandidate) : 'this meal') + ' from the plan? This does not delete the recipe.'" [buttons]="deleteAlertButtons" (didDismiss)="deleteCandidate = undefined"></ion-alert>
+<ion-alert [isOpen]="!!deleteCandidate" header="Delete this planned meal?" [message]="'Remove ' + (deleteCandidate ? recipeName(deleteCandidate) : 'this meal') + ' from the plan? This does not delete the recipe.'" [buttons]="deleteAlertButtons" (willPresent)="onDeleteAlertWillPresent()" (didDismiss)="onDeleteAlertDidDismiss()"></ion-alert>

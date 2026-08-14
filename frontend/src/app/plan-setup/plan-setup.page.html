@@ -66,18 +66,13 @@
         <ion-item><ion-select label="Cooking-time budget" labelPlacement="stacked" [(ngModel)]="cookingTimeBudget"><ion-select-option value="15">15 minutes</ion-select-option><ion-select-option value="30">30 minutes</ion-select-option><ion-select-option value="45">45 minutes</ion-select-option><ion-select-option value="60">60 minutes</ion-select-option><ion-select-option value="90+">90+ minutes</ion-select-option></ion-select></ion-item>
         <ion-item><ion-select label="Time limit" labelPlacement="stacked" [(ngModel)]="timePreference"><ion-select-option value="strict">Strict — exclude meals over budget</ion-select-option><ion-select-option value="flexible">Flexible — prefer the budget</ion-select-option></ion-select></ion-item>
         <ion-item><ion-select label="Leftovers / meal pattern" labelPlacement="stacked" [(ngModel)]="leftoverStrategy"><ion-select-option value="avoid_leftovers">Different meals where possible</ion-select-option><ion-select-option value="reuse_ulam">Reuse one ulam across requested meals</ion-select-option><ion-select-option value="main_with_rice_side">Main dish with rice or side</ion-select-option></ion-select></ion-item>
-        <ion-item><ion-note color="medium">The planner ranks safely first, then nutrition, pantry and expiry use, time, preferences, variety, and waste reduction.</ion-note></ion-item>
+        <ion-item><ion-note color="medium">Plans use the Filipino recipe catalogue and rank safely first, then nutrition, pantry and expiry use, time, preferences, variety, and waste reduction.</ion-note></ion-item>
       </ion-list>
 
       <ion-list inset="true" class="preference-list">
-        <ion-list-header><ion-label>Your preferences</ion-label></ion-list-header>
-        <ion-item lines="none"><ion-label class="preference-label"><h2>Favorite cuisines</h2><p>Choose flavors to keep in mind when you review your draft.</p></ion-label></ion-item>
-        <ion-item lines="none"><div class="choice-grid" role="group" aria-label="Favorite cuisines"><button type="button" *ngFor="let cuisine of cuisineOptions" [class.selected]="hasCuisine(cuisine)" (click)="toggleCuisine(cuisine)">{{ cuisine }}</button></div></ion-item>
+        <ion-list-header><ion-label>Dietary safety</ion-label></ion-list-header>
         <ion-item><ion-select label="Dietary needs" labelPlacement="stacked" [(ngModel)]="dietPreference"><ion-select-option value="saved-profile">Use saved profile restrictions</ion-select-option><ion-select-option value="review-profile">Review profile before planning</ion-select-option></ion-select></ion-item>
         <ion-item><ion-note color="medium">Allergy, dietary, and child-safety exclusions are always checked from the selected profile.</ion-note></ion-item>
-        <ion-item lines="none"><ion-label class="preference-label"><h2>Available equipment</h2><p>Keep your kitchen setup in view as you choose meals.</p></ion-label></ion-item>
-        <ion-item lines="none"><div class="choice-grid" role="group" aria-label="Available equipment"><button type="button" *ngFor="let equipment of equipmentOptions" [class.selected]="hasEquipment(equipment.value)" (click)="toggleEquipment(equipment.value)"><ion-icon [name]="equipment.icon"></ion-icon>{{ equipment.label }}</button></div></ion-item>
-        <ion-item><ion-note color="medium">Cuisine and equipment choices are planning notes for your review; the planner still verifies safety and pantry availability.</ion-note></ion-item>
       </ion-list>
 
       <ion-list inset="true" *ngIf="household; else personalProfile">
@@ -182,11 +177,11 @@
   (didDismiss)="showConflictChoice = false">
 </ion-alert>
 
-<ion-modal [isOpen]="!!attendanceEditor" [backdropDismiss]="false" (didDismiss)="cancelSpecificDays()">
+<ion-modal [isOpen]="!!attendanceEditor" [backdropDismiss]="false" aria-labelledby="attendance-editor-title" (didDismiss)="onAttendanceEditorDidDismiss()">
   <ng-template>
     <ion-header>
       <ion-toolbar>
-        <ion-title>Choose attendance dates</ion-title>
+        <ion-title id="attendance-editor-title">Choose attendance dates</ion-title>
         <ion-buttons slot="end"><ion-button (click)="cancelSpecificDays()">Cancel</ion-button></ion-buttons>
       </ion-toolbar>
     </ion-header>

@@ -86,7 +86,7 @@ export class RecipesPage implements OnDestroy {
   }
   private async chooseServings(recipe: Recommendation): Promise<number | undefined> {
     let servings: number | undefined;
-    const alert = await this.alerts.create({ header: `Cook ${recipe.recipe.name}?`, message: 'Choose the number of servings before starting Guided Cooking.', inputs: [{ name: 'servings', type: 'number', value: String(recipe.recipe.servings || 1), min: 1, max: 100, label: 'Servings' }], buttons: [{ text: 'Cancel', role: 'cancel' }, { text: 'Start cooking', role: 'confirm', handler: values => { servings = Math.max(1, Math.min(100, Number(values.servings) || 1)); } }] });
+    const alert = await this.alerts.create({ header: `Cook ${recipe.recipe.name}?`, message: 'One serving is roughly one person.', inputs: [{ name: 'servings', type: 'number', value: String(recipe.recipe.servings || 1), min: 1, max: 100, label: 'People to cook for' }], buttons: [{ text: 'Cancel', role: 'cancel' }, { text: 'Start cooking', role: 'confirm', handler: values => { servings = Math.max(1, Math.min(100, Number(values.servings) || 1)); } }] });
     await alert.present(); await alert.onDidDismiss(); return servings;
   }
   toggleFavorite(recipe: Recommendation): void {

@@ -126,8 +126,8 @@ export class DashboardPage {
   private async chooseServings(item: Recommendation): Promise<number | undefined> {
     let servings: number | undefined;
     const alert = await this.alerts.create({
-      header: `Cook ${item.recipe.name}?`, message: 'Choose the number of servings before starting Guided Cooking.',
-      inputs: [{ name: 'servings', type: 'number', value: String(item.recipe.servings || 1), min: 1, max: 100, label: 'Servings' }],
+      header: `Cook ${item.recipe.name}?`, message: 'One serving is roughly one person.',
+      inputs: [{ name: 'servings', type: 'number', value: String(item.recipe.servings || 1), min: 1, max: 100, label: 'People to cook for' }],
       buttons: [{ text: 'Cancel', role: 'cancel' }, { text: 'Start cooking', role: 'confirm', handler: values => { servings = Math.max(1, Math.min(100, Number(values.servings) || 1)); } }],
     });
     await alert.present(); await alert.onDidDismiss(); return servings;

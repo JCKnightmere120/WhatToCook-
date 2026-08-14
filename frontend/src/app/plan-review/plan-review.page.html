@@ -110,11 +110,11 @@
   </main>
 </ion-content>
 
-<ion-modal [isOpen]="!!editor" (didDismiss)="closeMealEditor()">
+<ion-modal [isOpen]="!!editor" aria-labelledby="meal-change-title" (didDismiss)="onMealEditorDidDismiss()">
   <ng-template>
     <ion-header>
       <ion-toolbar>
-        <ion-title>Change meal</ion-title>
+        <ion-title id="meal-change-title">Change meal</ion-title>
         <ion-buttons slot="end"><ion-button (click)="closeMealEditor()">Close</ion-button></ion-buttons>
       </ion-toolbar>
     </ion-header>
@@ -158,11 +158,11 @@
   </ng-template>
 </ion-modal>
 
-<ion-modal [isOpen]="!!purchaseDrafts" (didDismiss)="closePurchasedItems()">
+<ion-modal [isOpen]="!!purchaseDrafts" aria-labelledby="purchased-items-title" (didDismiss)="onPurchasedItemsDidDismiss()">
   <ng-template>
     <ion-header>
       <ion-toolbar>
-        <ion-title>Add bought items</ion-title>
+        <ion-title id="purchased-items-title">Add bought items</ion-title>
         <ion-buttons slot="end"><ion-button (click)="closePurchasedItems()">Close</ion-button></ion-buttons>
       </ion-toolbar>
     </ion-header>

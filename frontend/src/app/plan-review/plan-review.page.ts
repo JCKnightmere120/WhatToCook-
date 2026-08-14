@@ -9,6 +9,7 @@ import {
   PurchasedPlanIngredient,
   Recommendation,
 } from '../services/api.service';
+import { PantryChangeService } from '../services/pantry-change.service';
 
 type MealType = 'breakfast' | 'lunch' | 'dinner';
 type StorageType = 'room_temperature' | 'refrigerated' | 'frozen' | 'other' | 'unknown';
@@ -60,8 +61,14 @@ export class PlanReviewPage {
   editorMessage = '';
   purchaseMessage = '';
   shortagesAdded = false;
+  private modalReturnFocus?: HTMLElement;
 
-  constructor(private api: ApiService, private route: ActivatedRoute, private router: Router) {}
+  constructor(
+    private api: ApiService,
+    private route: ActivatedRoute,
+    private router: Router,
+    private pantryChanges: PantryChangeService,
+  ) {}
 
   ionViewWillEnter(): void {
     const id = Number(this.route.snapshot.paramMap.get('id'));
@@ -128,6 +135,7 @@ export class PlanReviewPage {
 
   openMealEditor(meal: MealPlan): void {
     if (!this.isDraft) return;
+    this.rememberModalReturnFocus();
     this.editorMessage = '';
     this.editor = {
       id: meal.id,
@@ -143,6 +151,7 @@ export class PlanReviewPage {
     this.editor = undefined;
     this.editorMessage = '';
   }
+  onMealEditorDidDismiss(): void { this.closeMealEditor(); this.restoreModalFocus(); }
 
   isEditorDinerSelected(dinerId: number): boolean {
     return !!this.editor?.dinerIds.includes(dinerId);
@@ -214,6 +223,7 @@ export class PlanReviewPage {
       this.message = 'There are no shortage items to add to the pantry.';
       return;
     }
+    this.rememberModalReturnFocus();
     this.purchaseMessage = '';
     this.purchaseDrafts = this.shortages.map(item => ({
       selected: true,
@@ -228,9 +238,10 @@ export class PlanReviewPage {
     this.purchaseDrafts = undefined;
     this.purchaseMessage = '';
   }
+  onPurchasedItemsDidDismiss(): void { this.closePurchasedItems(); this.restoreModalFocus(); }
 
   savePurchasedItems(): void {
-    if (!this.batchId || !this.purchaseDrafts) return;
+    if (!this.batchId || !this.purchaseDrafts || this.addingPurchasedItems) return;
     const selected = this.purchaseDrafts.filter(item => item.selected);
     if (!selected.length) {
       this.purchaseMessage = 'Select at least one item to add to the pantry.';
@@ -253,8 +264,10 @@ export class PlanReviewPage {
       next: result => {
         this.addingPurchasedItems = false;
         this.applyResponse(result.preview);
+        this.pantryChanges.publishAddedItems(result.items, result.preview.batch.family_id);
+        const count = result.items.length;
         this.closePurchasedItems();
-        this.message = 'Added the purchased items to the pantry. Ingredient availability has been checked again.';
+        this.message = `Added ${count} purchased item${count === 1 ? '' : 's'} to the pantry. Ingredient availability has been checked again.`;
       },
       error: error => {
         this.addingPurchasedItems = false;
@@ -273,7 +286,9 @@ export class PlanReviewPage {
       next: result => {
         this.saving = false;
         this.applyResponse(result);
-        this.router.navigate(['/tabs/meal-plan'], { replaceUrl: true, queryParams: { refresh: Date.now() } });
+        const firstMeal = result.meal_plans.slice().sort((a, b) => a.planned_date.localeCompare(b.planned_date))[0];
+        const startDate = firstMeal?.planned_date?.slice(0, 10) || result.batch.start_date;
+        this.router.navigate(['/tabs/meal-plan'], { replaceUrl: true, queryParams: { refresh: Date.now(), start_date: startDate, generated_range: `${result.batch.start_date} to ${result.batch.end_date}` } });
       },
       error: error => {
         this.saving = false;
@@ -371,6 +386,9 @@ export class PlanReviewPage {
       this.api.householdProfiles(familyId).subscribe({ next: result => this.diners = result.household_profiles });
     }
   }
+
+  private rememberModalReturnFocus(): void { this.modalReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : undefined; }
+  private restoreModalFocus(): void { const target = this.modalReturnFocus; this.modalReturnFocus = undefined; if (target?.isConnected) setTimeout(() => target.focus(), 0); }
 
   private errorMessage(error: { error?: { message?: string; errors?: Record<string, string[]> } }, fallback: string): string {
     const validationErrors = error?.error?.errors;

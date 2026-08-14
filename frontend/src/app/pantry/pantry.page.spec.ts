@@ -9,6 +9,7 @@ import { ExploreContainerComponentModule } from '../explore-container/explore-co
 import { PantryPage } from './pantry.page';
 import { receiptCandidates } from './pantry.page';
 import { UseAmountModalComponent } from './use-amount-modal.component';
+import { PantryChangeService } from '../services/pantry-change.service';
 
 describe('PantryPage', () => {
   let component: PantryPage;
@@ -53,6 +54,20 @@ describe('PantryPage', () => {
     component.selectedCategory = 'All';
     component.pantrySearch = 'rice';
     expect(component.filteredItems(component.personalItems)).toEqual([rice]);
+  });
+
+  it('shows a confirmed purchase in the correct pantry scope immediately', () => {
+    const changes = TestBed.inject(PantryChangeService);
+    component.personalItems = [{ id: 1, name: 'Rice', family_id: null }];
+
+    changes.publishAddedItems([{ id: 2, name: 'Chicken' }], 7);
+    changes.publishAddedItems([{ id: 3, name: 'Eggs', family_id: null }], 7);
+
+    expect(component.householdItems).toEqual([jasmine.objectContaining({ id: 2, family_id: 7 })]);
+    expect(component.personalItems).toEqual([
+      jasmine.objectContaining({ id: 1, name: 'Rice' }),
+      jasmine.objectContaining({ id: 3, name: 'Eggs', family_id: null }),
+    ]);
   });
 });
 

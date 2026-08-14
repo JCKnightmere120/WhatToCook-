@@ -36,13 +36,6 @@ export class PlanSetupPage {
     { value: 'weekends', label: 'Weekends only' },
     { value: 'specific_days', label: 'Specific days' },
   ];
-  readonly cuisineOptions = ['Filipino', 'Asian', 'Mediterranean', 'Western'];
-  readonly equipmentOptions = [
-    { value: 'stovetop', label: 'Stovetop', icon: 'flame-outline' },
-    { value: 'oven', label: 'Oven', icon: 'pizza-outline' },
-    { value: 'air-fryer', label: 'Air fryer', icon: 'restaurant-outline' },
-    { value: 'rice-cooker', label: 'Rice cooker', icon: 'cafe-outline' },
-  ];
 
   readonly minimumDate = this.toDateOnly(new Date());
   startDate = this.minimumDate;
@@ -52,9 +45,7 @@ export class PlanSetupPage {
   cookingTimeBudget: '15' | '30' | '45' | '60' | '90+' = '60';
   timePreference: 'strict' | 'flexible' = 'flexible';
   leftoverStrategy: 'avoid_leftovers' | 'reuse_ulam' | 'main_with_rice_side' = 'avoid_leftovers';
-  cuisinePreferences: string[] = ['Filipino'];
   dietPreference = 'saved-profile';
-  availableEquipment: string[] = ['stovetop'];
   servings = 1;
   contextId: PlanContext = 'personal';
   families: Family[] = [];
@@ -71,6 +62,7 @@ export class PlanSetupPage {
   message = '';
   conflictMessage = '';
   showConflictChoice = false;
+  private modalReturnFocus?: HTMLElement;
   readonly conflictAlertButtons = [
     { text: 'Cancel', role: 'cancel' },
     { text: 'Review existing', handler: () => this.router.navigateByUrl('/tabs/meal-plan') },
@@ -109,16 +101,6 @@ export class PlanSetupPage {
     this.endDate = this.toDateOnly(this.addDays(start, (length * 7) - 1));
   }
 
-  toggleCuisine(cuisine: string): void {
-    this.cuisinePreferences = this.cuisinePreferences.includes(cuisine) ? this.cuisinePreferences.filter(item => item !== cuisine) : [...this.cuisinePreferences, cuisine];
-  }
-  hasCuisine(cuisine: string): boolean { return this.cuisinePreferences.includes(cuisine); }
-
-  toggleEquipment(equipment: string): void {
-    this.availableEquipment = this.availableEquipment.includes(equipment) ? this.availableEquipment.filter(item => item !== equipment) : [...this.availableEquipment, equipment];
-  }
-  hasEquipment(equipment: string): boolean { return this.availableEquipment.includes(equipment); }
-
   isMealTypeSelected(type: MealType): boolean {
     return this.mealTypesSelected.includes(type);
   }
@@ -152,6 +134,7 @@ export class PlanSetupPage {
   }
 
   openAttendanceEditor(diner: HouseholdProfile, originalMode = this.attendanceFor(diner.id), originalDates = this.specificAttendanceDates[diner.id] || []): void {
+    this.rememberModalReturnFocus();
     this.attendanceEditor = {
       diner,
       originalMode,
@@ -184,6 +167,7 @@ export class PlanSetupPage {
     this.specificAttendanceDates[diner.id] = [...originalDates];
     this.attendanceEditor = undefined;
   }
+  onAttendanceEditorDidDismiss(): void { this.cancelSpecificDays(); this.restoreModalFocus(); }
 
   specificDaysSummary(dinerId: number): string {
     const dates = this.datesWithinPlan(this.specificAttendanceDates[dinerId] || []);
@@ -382,6 +366,9 @@ export class PlanSetupPage {
     const planDates = new Set(this.datesInRange());
     return [...new Set(dates)].filter(date => planDates.has(date)).sort();
   }
+
+  private rememberModalReturnFocus(): void { this.modalReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : undefined; }
+  private restoreModalFocus(): void { const target = this.modalReturnFocus; this.modalReturnFocus = undefined; if (target?.isConnected) setTimeout(() => target.focus(), 0); }
 
   dateLabel(date: string): string {
     const parsed = this.dateFromInput(date);

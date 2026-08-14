@@ -1,5 +1,5 @@
 import { ActivatedRoute, Router } from '@angular/router';
-import { of } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import {
   ApiService,
   HouseholdProfile,
@@ -8,10 +8,12 @@ import {
   MealPlanIngredientStatus,
 } from '../services/api.service';
 import { PlanReviewPage } from './plan-review.page';
+import { PantryChangeService } from '../services/pantry-change.service';
 
 describe('PlanReviewPage', () => {
   let api: jasmine.SpyObj<ApiService>;
   let router: jasmine.SpyObj<Router>;
+  let pantryChanges: jasmine.SpyObj<PantryChangeService>;
   let component: PlanReviewPage;
 
   const diner: HouseholdProfile = { id: 31, family_id: 7, name: 'Dad', relation: 'Father' };
@@ -50,8 +52,9 @@ describe('PlanReviewPage', () => {
       'saveMealPlanBatch',
     ]);
     router = jasmine.createSpyObj<Router>('Router', ['navigate', 'navigateByUrl']);
+    pantryChanges = jasmine.createSpyObj<PantryChangeService>('PantryChangeService', ['publishAddedItems']);
     const route = { snapshot: { paramMap: { get: () => '17' } } } as unknown as ActivatedRoute;
-    component = new PlanReviewPage(api, route, router);
+    component = new PlanReviewPage(api, route, router, pantryChanges);
     component.batchId = 17;
     component.response = response();
     component.diners = [diner];
@@ -79,7 +82,7 @@ describe('PlanReviewPage', () => {
   it('adds confirmed bought shortages to the pantry and uses the returned recheck', () => {
     const refreshed = response();
     refreshed.summary = { meal_count: 1, ready_count: 1, ingredients: [], shortages: [], needs_review: [] };
-    api.addMealPlanBatchPurchasedItems.and.returnValue(of({ items: [], preview: refreshed }));
+    api.addMealPlanBatchPurchasedItems.and.returnValue(of({ items: [{ id: 1, name: 'Chicken' }], preview: refreshed }));
 
     component.openPurchasedItems();
     component.savePurchasedItems();
@@ -89,7 +92,33 @@ describe('PlanReviewPage', () => {
     }]);
     expect(component.purchaseDrafts).toBeUndefined();
     expect(component.response?.summary.ready_count).toBe(1);
-    expect(component.message).toContain('Ingredient availability has been checked again');
+    expect(component.message).toBe('Added 1 purchased item to the pantry. Ingredient availability has been checked again.');
+    expect(pantryChanges.publishAddedItems).toHaveBeenCalledWith([{ id: 1, name: 'Chicken' }], 7);
+  });
+
+  it('keeps purchase selections and quantities when adding purchased items fails', () => {
+    api.addMealPlanBatchPurchasedItems.and.returnValue(throwError(() => ({ error: { message: 'Pantry is unavailable.' } })));
+    component.openPurchasedItems();
+    component.purchaseDrafts![0].quantity = 0.5;
+
+    component.savePurchasedItems();
+
+    expect(component.purchaseDrafts?.[0]).toEqual(jasmine.objectContaining({ name: 'Chicken', quantity: 0.5, selected: true }));
+    expect(component.purchaseMessage).toBe('Pantry is unavailable.');
+    expect(component.addingPurchasedItems).toBeFalse();
+    expect(pantryChanges.publishAddedItems).not.toHaveBeenCalled();
+  });
+
+  it('does not submit purchased items twice while the request is running', () => {
+    const pending = new Subject<{ items: never[]; preview: MealPlanBatchResponse }>();
+    api.addMealPlanBatchPurchasedItems.and.returnValue(pending);
+    component.openPurchasedItems();
+
+    component.savePurchasedItems();
+    component.savePurchasedItems();
+
+    expect(api.addMealPlanBatchPurchasedItems).toHaveBeenCalledTimes(1);
+    pending.complete();
   });
 
   it('saves with the selected conflict resolution and returns to the planner', () => {

@@ -64,7 +64,7 @@
 .progress-card span { color: var(--wtc-color-primary); font-size: .72rem; font-weight: 800; letter-spacing: .12em; }
 .progress-steps { grid-column: 1 / -1; display: flex; align-items: center; gap: 7px; }
 .progress-steps b { display: grid; width: 24px; height: 24px; place-items: center; border: 1px solid var(--wtc-color-border-strong); border-radius: 50%; color: var(--wtc-color-text-muted); font-size: .75rem; }
-.progress-steps b.complete { border-color: var(--wtc-color-primary); background: var(--wtc-color-primary); color: #fff; }
+.progress-steps b.complete { border-color: var(--wtc-color-primary); background: var(--wtc-color-primary); color: var(--ion-color-primary-contrast); }
 .progress-steps i { height: 2px; flex: 1; background: var(--wtc-color-border-strong); }
 
 .message {
@@ -83,4 +83,13 @@ ion-list {
 ion-note {
   white-space: normal;
   line-height: 1.4;
+}
+
+.choice-grid button:focus-visible { outline: none; box-shadow: var(--wtc-focus-ring); }
+
+@media (max-width: 25.25rem) {
+  .page { padding: var(--wtc-space-3); }
+  .setup-hero { margin-right: 0; margin-left: 0; }
+  .choice-grid { gap: var(--wtc-space-2); }
+  .choice-grid button { flex: 1 1 calc(50% - var(--wtc-space-2)); justify-content: center; }
 }

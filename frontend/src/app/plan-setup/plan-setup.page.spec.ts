@@ -63,6 +63,8 @@ describe('PlanSetupPage', () => {
     expect(payload.family_id).toBe(family.id);
     expect(payload.diner_profile_ids).toEqual([dad.id, son.id]);
     expect(payload.meal_types).toEqual(['breakfast', 'dinner']);
+    expect(payload).not.toEqual(jasmine.objectContaining({ cuisine_preferences: jasmine.anything() }));
+    expect(payload).not.toEqual(jasmine.objectContaining({ available_equipment: jasmine.anything() }));
     expect(weekday).toBeDefined();
     expect(weekend).toBeDefined();
     expect(payload.attendance_by_date?.[weekday as string]).toEqual([dad.id]);
@@ -131,15 +133,22 @@ describe('PlanSetupPage', () => {
     expect(api.generateMealPlanBatch).not.toHaveBeenCalled();
   });
 
-  it('sets a weekly end date and keeps cuisine and equipment choices interactive', () => {
+  it('uses Filipino catalogue planning inputs without legacy cuisine or equipment fields for a personal plan', () => {
     component.startDate = '2099-08-03';
+    component.endDate = '2099-08-03';
+    component.mealTypesSelected = ['dinner'];
+    api.generateMealPlanBatch.and.returnValue(of(draftResponse));
 
     component.setPlanLength(2);
-    component.toggleCuisine('Asian');
-    component.toggleEquipment('oven');
+    component.generate();
+
+    const payload = api.generateMealPlanBatch.calls.mostRecent().args[0] as MealPlanBatchGenerationPayload;
 
     expect(component.endDate).toBe('2099-08-16');
-    expect(component.hasCuisine('Asian')).toBeTrue();
-    expect(component.hasEquipment('oven')).toBeTrue();
+    expect(payload.family_id).toBeUndefined();
+    expect(payload.cooking_time_budget).toBe(component.cookingTimeBudget);
+    expect(payload.leftover_strategy).toBe(component.leftoverStrategy);
+    expect(payload).not.toEqual(jasmine.objectContaining({ cuisine_preferences: jasmine.anything() }));
+    expect(payload).not.toEqual(jasmine.objectContaining({ available_equipment: jasmine.anything() }));
   });
 });

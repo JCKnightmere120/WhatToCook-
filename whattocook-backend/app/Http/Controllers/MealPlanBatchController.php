@@ -161,27 +161,35 @@ class MealPlanBatchController extends Controller
             'items.*.expiry_date' => 'nullable|date|after_or_equal:items.*.purchase_date',
             'items.*.storage_type' => 'nullable|in:room_temperature,refrigerated,frozen,other,unknown',
         ]);
-        $items = collect($data['items'])->map(function (array $item) use ($request, $mealPlanBatch, $freshness) {
-            $source = 'unknown';
-            $estimate = $freshness->estimate($item['name'], $item['unit'], $item['storage_type'] ?? 'unknown', $source);
+        $items = DB::transaction(function () use ($data, $request, $mealPlanBatch, $freshness) {
+            return collect($data['items'])->map(function (array $item) use ($request, $mealPlanBatch, $freshness) {
+                $source = 'unknown';
+                $storageType = $item['storage_type'] ?? 'unknown';
+                $estimate = $freshness->estimate($item['name'], $item['unit'], $storageType, $source);
+                // Optional validated fields are omitted from Laravel's validated data.
+                // Read them defensively so purchases without a printed expiry date work.
+                $expiryDate = $item['expiry_date'] ?? null;
 
-            return PantryItem::create([
-                'user_id' => $request->user()->id,
-                'family_id' => $mealPlanBatch->family_id,
-                'name' => $item['name'],
-                'quantity' => (string) $item['quantity'],
-                'quantity_value' => $item['quantity'],
-                'unit' => $item['unit'],
-                'purchase_date' => $item['purchase_date'] ?? now()->toDateString(),
-                'purchase_source' => $source,
-                'storage_type' => $item['storage_type'] ?? 'unknown',
-                'freshness_condition' => 'unknown',
-                'expiry_date' => $item['expiry_date'] ?? $estimate['expiry_date'],
-                'freshness_review_date' => $item['expiry_date'] ?? $estimate['review_date'],
-                'freshness_status' => $item['expiry_date'] ? 'fresh' : $estimate['status'],
-                'freshness_confidence' => $item['expiry_date'] ? 'high' : $estimate['confidence'],
-                'is_expiry_estimated' => empty($item['expiry_date']),
-            ]);
+                return PantryItem::create([
+                    'user_id' => $request->user()->id,
+                    // A batch always defines the pantry scope: null is personal;
+                    // a family ID is the household's shared pantry.
+                    'family_id' => $mealPlanBatch->family_id,
+                    'name' => $item['name'],
+                    'quantity' => (string) $item['quantity'],
+                    'quantity_value' => $item['quantity'],
+                    'unit' => $item['unit'],
+                    'purchase_date' => $item['purchase_date'] ?? now()->toDateString(),
+                    'purchase_source' => $source,
+                    'storage_type' => $storageType,
+                    'freshness_condition' => 'unknown',
+                    'expiry_date' => $expiryDate ?? $estimate['expiry_date'],
+                    'freshness_review_date' => $expiryDate ?? $estimate['review_date'],
+                    'freshness_status' => $expiryDate ? 'fresh' : $estimate['status'],
+                    'freshness_confidence' => $expiryDate ? 'high' : $estimate['confidence'],
+                    'is_expiry_estimated' => $expiryDate === null,
+                ]);
+            })->values();
         });
 
         return response()->json(['items' => $items, 'preview' => $this->present($request, $mealPlanBatch->fresh(), $matcher)], 201);

@@ -199,7 +199,11 @@ ion-button[fill="clear"]:not(.ion-color) {
 }
 
 ion-button[disabled] {
-  --opacity: 0.52;
+  --background: var(--wtc-color-neutral-soft);
+  --color: var(--wtc-color-text-subtle);
+  --border-color: var(--wtc-color-border);
+  --opacity: 1;
+  cursor: not-allowed;
 }
 
 /* Cards and lists */
@@ -273,6 +277,12 @@ ion-item::part(native) {
 
 ion-item[button]::part(native):hover {
   background: var(--wtc-color-surface-muted);
+}
+
+ion-item[disabled] {
+  --background: var(--wtc-color-neutral-soft);
+  --color: var(--wtc-color-text-subtle);
+  opacity: 1;
 }
 
 ion-item h2,
@@ -486,6 +496,21 @@ ion-modal {
   --background: var(--wtc-color-surface);
   --border-radius: var(--wtc-radius-xl);
   --box-shadow: var(--wtc-shadow-raised);
+}
+
+ion-modal ion-header,
+ion-modal ion-footer {
+  background: var(--wtc-color-surface);
+}
+
+ion-modal ion-content {
+  --background: var(--wtc-color-surface);
+}
+
+ion-modal ion-list-header,
+ion-list-header {
+  color: var(--wtc-color-text);
+  font-weight: 700;
 }
 
 ion-alert {

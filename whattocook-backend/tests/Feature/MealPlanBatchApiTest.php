@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\MealPlan;
+use App\Models\MealPlanBatch;
 use App\Models\HouseholdProfile;
 use App\Models\PantryItem;
 use App\Models\Recipe;
@@ -50,6 +51,27 @@ class MealPlanBatchApiTest extends TestCase
         $this->assertDatabaseMissing('meal_plans', ['meal_plan_batch_id' => $batch['id']]);
     }
 
+    public function test_legacy_generation_options_remain_readable_on_saved_batches(): void
+    {
+        $user = User::factory()->create();
+        $batch = MealPlanBatch::create([
+            'user_id' => $user->id,
+            'start_date' => '2026-08-03',
+            'end_date' => '2026-08-03',
+            'status' => 'saved',
+            'generation_options' => [
+                'meal_types' => ['dinner'],
+                'cuisine_preferences' => ['Filipino'],
+                'available_equipment' => ['stovetop'],
+            ],
+        ]);
+
+        $this->actingAs($user, 'sanctum')->getJson("/api/meal-plan-batches/{$batch->id}")
+            ->assertOk()
+            ->assertJsonPath('batch.generation_options.cuisine_preferences.0', 'Filipino')
+            ->assertJsonPath('batch.generation_options.available_equipment.0', 'stovetop');
+    }
+
     public function test_a_family_draft_warns_and_cannot_save_when_a_selected_linked_diner_has_a_personal_meal_in_the_same_slot(): void
     {
         $owner = User::factory()->create();
@@ -89,6 +111,45 @@ class MealPlanBatchApiTest extends TestCase
             ->assertJsonPath('summary.ingredients.0.required_quantity', 1000)
             ->assertJsonPath('summary.ingredients.0.pantry_quantity', 500)
             ->assertJsonPath('summary.ingredients.0.missing_quantity', 500);
+    }
+
+    public function test_purchased_items_without_an_expiry_date_are_added_to_the_personal_pantry_and_recheck_the_draft(): void
+    {
+        $user = User::factory()->create();
+        $this->recipe($user, 'Half Kilo Rice', 'Rice', '1/2', 'kg');
+        $batch = $this->actingAs($user, 'sanctum')->postJson('/api/meal-plan-batches/generate', [
+            'start_date' => '2026-08-03', 'end_date' => '2026-08-03', 'meal_types' => ['dinner'], 'servings' => 2,
+        ])->assertCreated()->json('batch');
+
+        $this->actingAs($user, 'sanctum')->postJson("/api/meal-plan-batches/{$batch['id']}/purchased-items", [
+            'items' => [['name' => 'Rice', 'quantity' => 0.5, 'unit' => 'kg', 'storage_type' => 'unknown']],
+        ])->assertCreated()
+            ->assertJsonPath('items.0.family_id', null)
+            ->assertJsonPath('items.0.quantity_value', '0.500')
+            ->assertJsonPath('preview.summary.ingredients.0.status', 'ready')
+            ->assertJsonPath('preview.summary.shortages', []);
+
+        $this->assertDatabaseHas('pantry_items', ['user_id' => $user->id, 'family_id' => null, 'name' => 'Rice', 'unit' => 'kg']);
+    }
+
+    public function test_purchased_items_for_a_household_draft_are_added_to_its_shared_pantry(): void
+    {
+        $owner = User::factory()->create();
+        $family = $this->actingAs($owner, 'sanctum')->postJson('/api/families', ['name' => 'Santos Family'])->assertCreated()->json();
+        $diner = HouseholdProfile::where('family_id', $family['id'])->where('user_id', $owner->id)->firstOrFail();
+        $this->recipe($owner, 'Half Kilo Rice', 'Rice', '1/2', 'kg');
+        $batch = $this->actingAs($owner, 'sanctum')->postJson('/api/meal-plan-batches/generate', [
+            'family_id' => $family['id'], 'start_date' => '2026-08-03', 'end_date' => '2026-08-03',
+            'meal_types' => ['dinner'], 'diner_profile_ids' => [$diner->id],
+        ])->assertCreated()->json('batch');
+
+        $this->actingAs($owner, 'sanctum')->postJson("/api/meal-plan-batches/{$batch['id']}/purchased-items", [
+            'items' => [['name' => 'Rice', 'quantity' => 0.5, 'unit' => 'kg']],
+        ])->assertCreated()
+            ->assertJsonPath('items.0.family_id', $family['id'])
+            ->assertJsonPath('preview.summary.ingredients.0.status', 'ready');
+
+        $this->assertDatabaseHas('pantry_items', ['user_id' => $owner->id, 'family_id' => $family['id'], 'name' => 'Rice', 'unit' => 'kg']);
     }
 
     public function test_child_exclusions_portions_and_allergies_are_applied_to_each_day(): void
