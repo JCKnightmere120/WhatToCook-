@@ -34,4 +34,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(HouseholdProfile::class);
     }
+
+    public function isAdmin(): bool
+    {
+        return (bool) $this->is_admin;
+    }
 }
